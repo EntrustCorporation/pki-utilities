@@ -30,10 +30,7 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		read -r KEY_PATH
 		echo "Where would you like to store the CSR (e.g. /tmp/example.csr): "
 		read -r CSR_PATH
-		openssl req -nodes -newkey $KEY_TYPE:$KEY_LEN -keyout $KEY_PATH -out $CSR_PATH -subj \"$CSR_SUBJECT\"
-		wait
-		echo "-----Generated CSR-----"
-		cat $CSR_PATH
+		openssl req -nodes -newkey $KEY_TYPE:$KEY_LEN -keyout $KEY_PATH -out $CSR_PATH -subj $CSR_SUBJECT
 		main
 	elif [ $CAGW_OP == "2" ]
 	then
