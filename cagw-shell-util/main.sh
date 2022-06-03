@@ -1,12 +1,12 @@
 #!/bin/bash
 get_client_credentials() {
-	echo "Path to client credentials file (PKCS#12): "
+	echo -n "Path to client credentials file (PKCS#12): "
 	read -r P12
 
-	echo "Enter PKCS#12 file password: "
+	echo -n "Enter PKCS#12 file password: "
 	read -r P12_PWD
 
-	echo "Enter CA Gateway URL:"
+	echo -n "Enter CA Gateway URL: "
 	read -r CAGW_URL
 }
 main() {
@@ -22,15 +22,17 @@ main() {
 		echo "Enter full subject
 Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		read -r CSR_SUBJECT
-		echo "Enter key type: "
+		echo -n "Enter key type: "
 		read -r KEY_TYPE
-		echo "Enter key length: "
+		echo -n "Enter key length: "
 		read -r KEY_LEN
-		echo "Where would you like to store the key (e.g. /tmp/example.key): "
+		echo -n "Where would you like to store the key (e.g. /tmp/example.key): "
 		read -r KEY_PATH
-		echo "Where would you like to store the CSR (e.g. /tmp/example.csr): "
+		echo -n "Where would you like to store the CSR (e.g. /tmp/example.csr): "
 		read -r CSR_PATH
-		openssl req -nodes -newkey $KEY_TYPE:$KEY_LEN -keyout $KEY_PATH -out $CSR_PATH -subj $CSR_SUBJECT
+		openssl req -nodes -newkey $KEY_TYPE:$KEY_LEN -keyout $KEY_PATH -out $CSR_PATH -subj $CSR_SUBJECT &> /dev/null
+		sed -i 1d $CSR_PATH &> /dev/null
+		sed -i '' -e '$ d' $CSR_PATH &> /dev/null
 		main
 	elif [ $CAGW_OP == "2" ]
 	then
@@ -38,23 +40,31 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		main
 	elif [ $CAGW_OP == "3" ]
 	then
-		echo "Enter CA ID: "
+		echo -n "Enter CA ID: "
 		read -r CAID
 		curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/profiles
 		main
 	elif [ $CAGW_OP == "4" ]
 	then
-		echo "Enter CA ID: "
+		echo -n "Enter CA ID: "
 		read -r CAID
-		echo "Enter certificate profile ID: "
+		echo -n "Enter certificate profile ID: "
 		read -r PROFILE_ID
-		curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/profiles
+		echo -n "Enter path of the CSR file ["$CSR_PATH"]: "
+		read -r CSR_INPUT_PATH
+		if [ -z "$CSR_INPUT_PATH" ]
+		then
+				  CSR_INPUT_PATH = $CSR_PATH
+		fi
+		echo -n "Enter full subject DN: "
+		read -r CERT_OPT_PARAMS_SUBJECT_DN
+		curl  --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $CSR_INPUT_PATH)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"}}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments
 		main
 	elif [ $CAGW_OP == "5" ]
 	then
 		exit
 	else
-		echo "Invalid Selection"
+		echo -n "Invalid Selection"
 	fi
 }
 echo "--------------------------
