@@ -13,4 +13,6 @@ That is why we built this tool to allow customers to bulk revoke PKIaaS certific
 2. CA Gateway Credential is downloaded along with the password.
    - To generate and download the CA Gateway credentials
 
+| --- | --- |
+| 1. | Select Administration > PKIaaS Management. |
 | 1. | Select Administration > PKIaaS Management. |
