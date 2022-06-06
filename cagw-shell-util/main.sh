@@ -71,7 +71,6 @@ get_subject_altnames() {
 		printf -v "SAN_ARRAY" "%s" ""
 		get_subject_altnames
 	fi
-	echo "$SAN_ARRAY"
 }
 main() {
 	echo "Select the CA Gateway operation:
@@ -124,7 +123,8 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		read -r CERT_OPT_PARAMS_SUBJECT_DN
 		printf -v "SAN_ARRAY" "%s" "["
 		get_subject_altnames
-		curl  --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $CSR_INPUT_PATH)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments
+		res=$(curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $CSR_INPUT_PATH)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments) | jq '.enrollment.body'
+		echo $(sed 's/\n//g' <<<"$res")
 		main
 	elif [ $CAGW_OP == "5" ]
 	then
