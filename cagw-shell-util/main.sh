@@ -4,10 +4,74 @@ get_client_credentials() {
 	read -r P12
 
 	echo -n "Enter PKCS#12 file password: "
-	read -r P12_PWD
+	read -s P12_PWD
+	
+	printf "\n"
 
-	echo -n "Enter CA Gateway URL: "
+	echo -n "Enter CA Gateway URL (e.g. https://CAGW-Host/cagw): "
 	read -r CAGW_URL
+}
+get_subject_altnames() {
+	echo -n "Do you want to enter a Subject Alternate Name (Y/N): "
+	read -r SAN_NEEDED
+	
+	if [ -z "$SAN_NEEDED" ]
+	then
+		echo -n "Please select a Y/N"
+		get_subject_altnames
+	fi
+	if [ $SAN_NEEDED == "Y" ]
+	then
+		echo -n "Select the SAN attribute to be added from the list "
+		printf "\n"
+		echo -n "[1. rfc822Name | 2. dNSName | 3. directoryName | 4. uniformResourceIdentifier | 5. iPAddress | 6. registeredID]: "
+		read -r SAN_VAR_ID
+		
+		#\"der\": \"string\",
+		if [ $SAN_VAR_ID == "1" ]
+		then
+			printf -v "SAN_VAR_NAME" "%s" "rfc822Name"
+		elif [ $SAN_VAR_ID == "2" ]
+		then
+			printf -v "SAN_VAR_NAME" "%s" "dNSName"
+		elif [ $SAN_VAR_ID == "3" ]
+		then
+			printf -v "SAN_VAR_NAME" "%s" "directoryName"
+		elif [ $SAN_VAR_ID == "4" ]
+		then
+			printf -v "SAN_VAR_NAME" "%s" "uniformResourceIdentifier"
+		elif [ $SAN_VAR_ID == "5" ]
+		then
+			printf -v "SAN_VAR_NAME" "%s" "iPAddress"
+		elif [ $SAN_VAR_ID == "6" ]
+		then
+			printf -v "SAN_VAR_NAME" "%s" "registeredID"
+		else
+			echo -n "bad selection"
+			printf -v "SAN_ARRAY" "%s" ""
+			get_subject_altnames
+		fi
+		
+		echo -n "Enter value of the selected SAN attribute: "
+		read -r SAN_VALUE
+		
+		printf -v "SAN_ARRAY" "%s" "${SAN_ARRAY}{\"type\": \"$SAN_VAR_NAME\",\"value\": \"$SAN_VALUE\"},"
+		get_subject_altnames
+	elif [ $SAN_NEEDED == "N" ]
+	then
+		if [ "$SAN_ARRAY" == "[" ]
+		then
+			printf -v "SAN_ARRAY" "%s" "[]"
+		else 
+			printf -v "SAN_ARRAY" "%s" "${SAN_ARRAY%?}]"
+			return 1
+		fi
+	else
+		echo -n "bad selection"
+		printf -v "SAN_ARRAY" "%s" ""
+		get_subject_altnames
+	fi
+	echo "$SAN_ARRAY"
 }
 main() {
 	echo "Select the CA Gateway operation:
@@ -54,11 +118,13 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		read -r CSR_INPUT_PATH
 		if [ -z "$CSR_INPUT_PATH" ]
 		then
-				  CSR_INPUT_PATH = $CSR_PATH
+				  printf -v "CSR_INPUT_PATH" "%s" $CSR_PATH
 		fi
 		echo -n "Enter full subject DN: "
 		read -r CERT_OPT_PARAMS_SUBJECT_DN
-		curl  --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $CSR_INPUT_PATH)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"}}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments
+		printf -v "SAN_ARRAY" "%s" "["
+		get_subject_altnames
+		curl  --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $CSR_INPUT_PATH)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments
 		main
 	elif [ $CAGW_OP == "5" ]
 	then
