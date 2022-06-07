@@ -17,6 +17,7 @@ get_ation_type () {
 	echo -n "1. Revoke
 2. Renew
 3. Reissue"
+	printf "\n"
 	read -r ACTION_TYPE_ID
 	if [ $ACTION_TYPE_ID == "1" ]
 	then
@@ -44,6 +45,7 @@ get_ation_reason () {
 6. cessationOfOperation
 7. certificateHold
 8. privilegeWithdrawn"
+	printf "\n"
 	read -r ACTION_REASON_ID
 	if [ $ACTION_REASON_ID == "1" ]
 	then
@@ -213,7 +215,7 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		echo -n "Enter a comment about the action: "
 		read -r COMMENT
 		get_ation_reason
-		curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions
+		curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions &> /dev/null
 		main
 	elif [ $CAGW_OP == "6" ]
 	then
