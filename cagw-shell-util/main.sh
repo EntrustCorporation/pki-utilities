@@ -78,7 +78,10 @@ main() {
 2. List all Certificate Authorities
 3. List all profiles for a Certificate Authority
 4. Enroll new certificate with CSR
-5. Exit"
+5. Certificate revocation by serial
+6. Bulk certificate issuance
+7. Bulk certificate revocation
+8. Exit"
 	read -r CAGW_OP
 	if [ $CAGW_OP == "1" ]
 	then
@@ -115,6 +118,8 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		read -r PROFILE_ID
 		echo -n "Enter path of the CSR file ["$CSR_PATH"]: "
 		read -r CSR_INPUT_PATH
+		echo -n "Where would you like to store the certificate (e.g. /tmp/certificate.pem): "
+		read -r CERT_PATH
 		if [ -z "$CSR_INPUT_PATH" ]
 		then
 				  printf -v "CSR_INPUT_PATH" "%s" $CSR_PATH
@@ -123,14 +128,35 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		read -r CERT_OPT_PARAMS_SUBJECT_DN
 		printf -v "SAN_ARRAY" "%s" "["
 		get_subject_altnames
-		res=$(curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $CSR_INPUT_PATH)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments) | jq '.enrollment.body'
-		echo $(sed 's/\n//g' <<<"$res")
+		curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $CSR_INPUT_PATH)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments > /tmp/resout.txt
+		response_data=$(cat /tmp/resout.txt)
+		cert_raw=$( jq '.enrollment.body' <<< "${response_data}" )
+		var1=${cert_raw%?}
+		var2=${var1:1}
+		echo $var2 > /tmp/tempCert.pem
+		sed 's/\\n/\r\n/g' /tmp/tempCert.pem > $CERT_PATH
+		rm -f /tmp/tempCert.pem
+		printf "\n"
+		echo "Certificate is written successfully to the file $CERT_PATH".
 		main
 	elif [ $CAGW_OP == "5" ]
+	then
+		echo -n "Feature not yet available."
+		main
+	elif [ $CAGW_OP == "6" ]
+	then
+		echo -n "Feature not yet available."
+		main
+	elif [ $CAGW_OP == "7" ]
+	then
+		echo -n "Feature not yet available."
+		main
+	elif [ $CAGW_OP == "8" ]
 	then
 		exit
 	else
 		echo -n "Invalid Selection"
+		main
 	fi
 }
 echo "--------------------------
