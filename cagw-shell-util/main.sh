@@ -11,6 +11,70 @@ get_client_credentials() {
 	echo -n "Enter CA Gateway URL (e.g. https://CAGW-Host/cagw): "
 	read -r CAGW_URL
 }
+get_ation_type () {
+	echo -n "Select action type from below"
+	printf "\n"
+	echo -n "1. Revoke
+2. Renew
+3. Reissue"
+	read -r ACTION_TYPE_ID
+	if [ $ACTION_TYPE_ID == "1" ]
+	then
+		printf -v "ACTION_TYPE" "%s" "RevokeAction"
+	elif [ $ACTION_TYPE_ID == "2" ]
+	then
+		printf -v "ACTION_TYPE" "%s" "RenewAction"
+	elif [ $ACTION_TYPE_ID == "3" ]
+	then
+		printf -v "ACTION_TYPE" "%s" "ReissueAction"
+	else
+		echo -n "bad selection"
+		printf -v "ACTION_TYPE" "%s" ""
+		get_ation_type
+	fi
+}
+get_ation_reason () {
+	echo -n "Select action reason from below"
+	printf "\n"
+	echo -n "1. unspecified
+2. keyCompromise
+3. caCompromise
+4. affiliationChanged
+5. superseded
+6. cessationOfOperation
+7. certificateHold
+8. privilegeWithdrawn"
+	read -r ACTION_REASON_ID
+	if [ $ACTION_REASON_ID == "1" ]
+	then
+		printf -v "ACTION_REASON" "%s" "unspecified"
+	elif [ $ACTION_REASON_ID == "2" ]
+	then
+		printf -v "ACTION_REASON" "%s" "keyCompromise"
+	elif [ $ACTION_REASON_ID == "3" ]
+	then
+		printf -v "ACTION_REASON" "%s" "caCompromise"
+	elif [ $ACTION_REASON_ID == "4" ]
+	then
+		printf -v "ACTION_REASON" "%s" "affiliationChanged"
+	elif [ $ACTION_REASON_ID == "5" ]
+	then
+		printf -v "ACTION_REASON" "%s" "superseded"
+	elif [ $ACTION_REASON_ID == "6" ]
+	then
+		printf -v "ACTION_REASON" "%s" "cessationOfOperation"
+	elif [ $ACTION_REASON_ID == "7" ]
+	then
+		printf -v "ACTION_REASON" "%s" "certificateHold"
+	elif [ $ACTION_REASON_ID == "8" ]
+	then
+		printf -v "ACTION_REASON" "%s" "privilegeWithdrawn"
+	else
+		echo -n "bad selection"
+		printf -v "ACTION_REASON" "%s" ""
+		get_ation_reason
+	fi
+}
 get_subject_altnames() {
 	echo -n "Do you want to enter a Subject Alternate Name (Y/N): "
 	read -r SAN_NEEDED
@@ -141,7 +205,15 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		main
 	elif [ $CAGW_OP == "5" ]
 	then
-		echo -n "Feature not yet available."
+		echo -n "Enter CA ID: "
+		read -r CAID
+		echo -n "Enter certificate serial number (Example: 00112233): "
+		read -r CERTIFICATE_SERIAL	
+		get_ation_type
+		echo -n "Enter a comment about the action: "
+		read -r COMMENT
+		get_ation_reason
+		curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions
 		main
 	elif [ $CAGW_OP == "6" ]
 	then
