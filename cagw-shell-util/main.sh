@@ -184,9 +184,9 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		main
 	elif [ $CAGW_OP == "4" ]
 	then
-		echo -n "Enter CA ID: "
+		echo -n "Enter CA ID [$CAID]: "
 		read -r CAID
-		echo -n "Enter certificate profile ID: "
+		echo -n "Enter certificate profile ID [$PROFILE_ID]: "
 		read -r PROFILE_ID
 		echo -n "Enter path of the CSR file ["$CSR_PATH"]: "
 		read -r CSR_INPUT_PATH
@@ -213,7 +213,7 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		main
 	elif [ $CAGW_OP == "5" ]
 	then
-		echo -n "Enter CA ID: "
+		echo -n "Enter CA ID [$CAID]: "
 		read -r CAID
 		echo -n "Enter certificate serial number (Example: 00112233): "
 		read -r CERTIFICATE_SERIAL	
@@ -225,7 +225,34 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		main
 	elif [ $CAGW_OP == "6" ]
 	then
-		echo -n "Feature not yet available."
+		echo -n "Enter CA ID [$CAID]: "
+		read -r CAID
+		echo -n "Enter certificate profile ID [$PROFILE_ID]: "
+		read -r PROFILE_ID
+		echo -n "Enter key type: "
+		read -r KEY_TYPE
+		echo -n "Enter key length: "
+		read -r KEY_LEN
+		echo -n "Enter the path to the CSV file: "
+		read -r ISSUE_CSV
+		echo -n "Enter the path for saving keys and certs: "
+		read -r TARGET_FOLDER
+		{
+			read
+			while IFS=, read -r commonName keyLen keyAlgo
+			do 
+				openssl req -nodes -newkey $keyAlgo:$keyLen -keyout "$TARGET_FOLDER/${commonName}.key" -out "$TARGET_FOLDER/${commonName}.csr" -subj "/CN=$CSR_SUBJECT" &> /dev/null
+				curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $TARGET_FOLDER/${commonName}.csr)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"/CN=$CSR_SUBJECT\"}}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments > /tmp/resout.txt
+				response_data=$(cat /tmp/resout.txt)
+				cert_raw=$( jq '.enrollment.body' <<< "${response_data}" )
+				var1=${cert_raw%?}
+				var2=${var1:1}
+				echo $var2 > /tmp/tempCert.pem
+				sed 's/\\n/\r\n/g' /tmp/tempCert.pem > $TARGET_FOLDER/$commonName.pem
+				rm -f /tmp/resout.txt
+				rm -f /tmp/tempCert.pem
+			done
+		} < $ISSUE_CSV
 		main
 	elif [ $CAGW_OP == "7" ]
 	then
