@@ -241,8 +241,10 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 			read
 			while IFS=, read -r commonName keyLen keyAlgo
 			do 
-				openssl req -nodes -newkey $keyAlgo:$keyLen -keyout "$TARGET_FOLDER/${commonName}.key" -out "$TARGET_FOLDER/${commonName}.csr" -subj "/CN=$CSR_SUBJECT" &> /dev/null
-				curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $TARGET_FOLDER/${commonName}.csr)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"/CN=$CSR_SUBJECT\"}}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments > /tmp/resout.txt
+				openssl req -nodes -newkey $keyAlgo:$keyLen -keyout "$TARGET_FOLDER/${commonName}.key" -out "$TARGET_FOLDER/${commonName}.csr" -subj "/CN=$commonName" &> /dev/null
+				sed -i 1d $TARGET_FOLDER/$commonName.csr &> /dev/null
+				sed -i '' -e '$ d' $TARGET_FOLDER/$commonName.csr &> /dev/null
+				curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < $TARGET_FOLDER/${commonName}.csr)\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"CN=$commonName\"}}" --cert-type P12 --cert $P12:$P12_PWD $CAGW_URL/v1/certificate-authorities/$CAID/enrollments > /tmp/resout.txt
 				response_data=$(cat /tmp/resout.txt)
 				cert_raw=$( jq '.enrollment.body' <<< "${response_data}" )
 				var1=${cert_raw%?}
@@ -251,8 +253,10 @@ Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 				sed 's/\\n/\r\n/g' /tmp/tempCert.pem > $TARGET_FOLDER/$commonName.pem
 				rm -f /tmp/resout.txt
 				rm -f /tmp/tempCert.pem
+				rm -f $TARGET_FOLDER/$commonName.csr
 			done
 		} < $ISSUE_CSV
+		echo -n "Certificates and Keys written to the folder $TARGET_FOLDER"
 		main
 	elif [ $CAGW_OP == "7" ]
 	then
