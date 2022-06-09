@@ -32,7 +32,9 @@
 
 #### Generate CSR with subject
 Generate CSR with given subject.
+
 It also massages the CSR so that the request is acceptable by CA Gateway.
+
 CA Gateway, currently requires header, footer, and nelines deleted.
 
 ```
