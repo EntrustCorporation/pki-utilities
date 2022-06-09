@@ -46,8 +46,29 @@ Where would you like to store the CSR (e.g. /tmp/example.csr): ./example.csr
 ```
 
 #### List all Certificate Authorities
+Fetches all the Certificate Authorities as configured on a given CA Gateway instance.
+
+Requires CA Gateway credentials for authenticating requests.
+
+```
+Path to client credentials file (PKCS#12): <Path to p12 file downloaded from ECS>
+Enter PKCS#12 file password: <P12 password>
+Enter CA Gateway URL (e.g. https://CAGW-Host/cagw): <CAGW URL>
+# Select option 2 list all CA Gateway supported CAs
+```
 
 #### List all profiles for a Certificate Authority
+Fetches all the Certificate Profiles configured for a give Certificate Authority.
+
+Requires CA Gateway credentials for authenticating requests.
+
+```
+Path to client credentials file (PKCS#12): <Path to p12 file downloaded from ECS>
+Enter PKCS#12 file password: <P12 password>
+Enter CA Gateway URL (e.g. https://CAGW-Host/cagw): <CAGW URL>
+Enter CA ID: <Get the CA ID using option 2>
+# Select option 3 list all CA Certificate Profiles
+```
 
 #### Enroll new certificate with CSR
 
