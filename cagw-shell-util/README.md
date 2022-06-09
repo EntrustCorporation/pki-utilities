@@ -31,6 +31,17 @@
 - Bulk certificate issuance
 
 #### Generate CSR with subject
+Generate CSR with given subject.
+It also massages the CSR so that the request is acceptable by CA Gateway.
+CA Gateway, currently requires header, footer, and nelines deleted.
+
+```
+Enter full subject (Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com): /CN=example.com
+Enter key type: rsa
+Enter key length: 2048
+Where would you like to store the key (e.g. /tmp/example.key): ./example.key
+Where would you like to store the CSR (e.g. /tmp/example.csr): ./example.csr
+```
 
 #### List all Certificate Authorities
 
