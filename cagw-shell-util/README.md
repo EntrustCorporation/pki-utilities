@@ -117,3 +117,22 @@ Select action reason from below
 ```
 
 #### Bulk certificate issuance
+Using a CSV file to generate keys and certs in bulk.
+
+Sample CSV file as below -
+
+```
+| commonName | keyLen | keyAlgo |
+| --- | --- | --- |
+| example.com | 2048 | rsa |
+| myorg.com | 2048 | rsa |
+```
+
+```
+Enter CA ID []: <Get the CA ID using option 2>
+Enter certificate profile ID []: <Get the CA ID using option 3>
+Enter key type: rsa
+Enter key length: 2048
+Enter the path to the CSV file: ./bulkIssue.csv
+Enter the path for saving keys and certs: /tmp/certs
+```
