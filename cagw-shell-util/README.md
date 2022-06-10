@@ -72,6 +72,24 @@ Enter CA ID: <Get the CA ID using option 2>
 
 #### Enroll new certificate with CSR
 
+```
+Enter CA ID []: <Get the CA ID using option 2>
+Enter certificate profile ID []: <Get the CA ID using option 3>
+Enter path of the CSR file []: <CSR generated using external tool or using option 1>
+Where would you like to store the certificate (e.g. /tmp/certificate.pem): <path where you want cert to be saved>
+Enter full subject DN: <subject DN of the cert to be issued. e.g. cn=example.com>
+Do you want to enter a Subject Alternate Name (Y/N): Y
+Select the SAN attribute to be added from the list
+1. rfc822Name
+2. dNSName
+3. directoryName
+4. uniformResourceIdentifier
+5. iPAddress
+6. registeredID
+5
+Enter value of the selected SAN attribute: 1.1.1.1
+```
+
 #### Certificate revocation by serial
 
 #### Bulk certificate issuance
