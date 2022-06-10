@@ -71,7 +71,9 @@ Enter CA ID: <Get the CA ID using option 2>
 ```
 
 #### Enroll new certificate with CSR
+Using a CSR generated via this script or any other external tool, use this option to send that certificate signing request to CA Gateway and get signed certificate back in PEM encoded format. 
 
+You can optionally add Subject Altnames to the request.
 ```
 Enter CA ID []: <Get the CA ID using option 2>
 Enter certificate profile ID []: <Get the CA ID using option 3>
