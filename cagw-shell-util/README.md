@@ -121,12 +121,10 @@ Using a CSV file to generate keys and certs in bulk.
 
 Sample CSV file as below -
 
-```
 | commonName | keyLen | keyAlgo |
 | --- | --- | --- |
 | example.com | 2048 | rsa |
 | myorg.com | 2048 | rsa |
-```
 
 ```
 Enter CA ID []: <Get the CA ID using option 2>
