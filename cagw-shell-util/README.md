@@ -93,5 +93,27 @@ Enter value of the selected SAN attribute: 1.1.1.1
 ```
 
 #### Certificate revocation by serial
+Revoke/renew/reissue certificate using the certificate's serial number.
+
+```
+Enter CA ID: <Get the CA ID using option 2>
+Enter certificate serial number (Example: 00112233): <cert serial number>
+Select action type from below
+1. Revoke
+2. Renew
+3. Reissue
+1
+Enter a comment about the action: some comment
+Select action reason from below
+1. unspecified
+2. keyCompromise
+3. caCompromise
+4. affiliationChanged
+5. superseded
+6. cessationOfOperation
+7. certificateHold
+8. privilegeWithdrawn
+2
+```
 
 #### Bulk certificate issuance
