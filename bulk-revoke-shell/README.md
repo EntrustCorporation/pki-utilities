@@ -42,14 +42,34 @@ That is why we built this tool to allow customers to bulk revoke PKIaaS certific
 
 2. Download the **PKIaaS Bulk Revocation Script** from this repository.
 3. Put the **PKIaaS Bulk Revocation Script**, the **CA Gateway Credential (PKCS#12)**, and the converted CSV file in one folder.
-4. Edit the **PKIaaS Bulk Revocation Script** and enter the CAID of the Issuing CA, check that the INPUT file matches the file name of the converted CSV file and that P12 points to the proper **CA Gateway Credential (PKCS#12)** file as shown here:
+4. Edit the **PKIaaS Bulk Revocation Script** and enter the CAID of the Issuing CA, check that the INPUT file matches the file name of the converted CSV file and that P12 points to the proper **CA Gateway Credential (PKCS#12)** file as shown here.
 
-    ```bash
-    CAID=ecssample~sample
-    INPUT=./certificate_list.csv
-    P12=./cagw.p12
-    CAGW_URL=https://cagw.pkiaas.entrust.com
-    ```
+    - If your CA is created under the US region:
+
+        ```bash
+        CAID=ecssample~sample
+        INPUT=./certificate_list.csv
+        P12=./cagw.p12
+        CAGW_URL=https://cagw.pkiaas.entrust.com
+        ```
+
+    - If your CA is created under the EU region:
+
+        ```bash
+        CAID=ecssample~sample
+        INPUT=./certificate_list.csv
+        P12=./cagw.p12
+        CAGW_URL=https://cagw.eu.pkiaas.entrust.com
+        ```
+
+    - If your CA is created under the PQ region:
+
+        ```bash
+        CAID=ecssample~sample
+        INPUT=./certificate_list.csv
+        P12=./cagw.p12
+        CAGW_URL=https://cagw.pqlab.pkiaas.entrust.com
+        ```
 
 5. Execute the script and enter the **CA Gateway Credential (PKCS#12)** password when asked.
 
