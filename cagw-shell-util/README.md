@@ -1,5 +1,27 @@
 ## Entrust Certificate Authority (CA) Gateway Shell utility
 
+### Table of Contents
+
+[Prerequisites](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+
+[Operations supported by the utility](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#operations-supported-by-the-utility)
+
+[Running the script](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#running-the-script)
+
+* [Generate CSR with subject](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#generate-csr-with-subject)
+* [List all Certificate Authorities]
+* [List all profiles for a Certificate Authority]
+* [Enroll new certificate with CSR]
+* [Enroll new certificate with PKCS #12]
+* [Certificate revocation by serial]
+* [Bulk certificate issuance]
+
+
+
+
+
+** fkdls
+
 ### Prerequisites
 #### Acquiring credentials
 1. PKIaaS Root CA and Issuing CA is set up and active.
@@ -413,4 +435,62 @@ Processing list of 2 bulk certificate enrollments...
 Certificates and Keys written to the folder /tmp
 ```
 
+#### Generate Report of Active Certificates
+Generate a CSV-formatted report of all active certificates from the selected Certificate Authority.
 
+Sample output:
+
+```
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+Selection: 8
+--------------------------
+Select a CA ID:
+1. Issuing-CA: ecsmcn158emsuw~1sw46hf1g0wrdc (CN=Example Issuing)
+2. Root-CA: ecsmcn158emsuw~mrajwn1pklzxjb (CN=Example Root)
+Enter CA ID []: 1
+
+Fetching list of certificate events...
+CAGW API requests to fetch certificate events are limited to 50 events per page when using PKIaaS.
+Fetched 50. Fetching next batch of 50 certificate events.
+Fetched 100. Fetching next batch of 50 certificate events.
+Fetched 150. Fetching next batch of 50 certificate events.
+Fetched 200. Fetching next batch of 50 certificate events.
+Fetched 250. Fetching next batch of 50 certificate events.
+Fetched 300. Fetching next batch of 50 certificate events.
+Fetched 350. Fetching next batch of 50 certificate events.
+Fetched 400. Fetching next batch of 50 certificate events.
+Fetched 450. Fetching next batch of 50 certificate events.
+Fetched 500. Fetching next batch of 50 certificate events.
+
+Processing certificiate events...
+Searching for revoked certificate events...
+Removing expired certificate entries...
+Extracting certificate details...
+Processed 48 of 548 non-revoked certificates
+Processed 98 of 548 non-revoked certificates
+Processed 148 of 548 non-revoked certificates
+Processed 198 of 548 non-revoked certificates
+Processed 248 of 548 non-revoked certificates
+Processed 298 of 548 non-revoked certificates
+Processed 348 of 548 non-revoked certificates
+Processed 398 of 548 non-revoked certificates
+Processed 448 of 548 non-revoked certificates
+Processed 498 of 548 non-revoked certificates
+Processed 548 of 548 non-revoked certificates
+
+Fetched a total of 550 certificate events
+Removed 2 revoked certificates entries (this is typically double the number of revoked certificates)
+CSV Contains 0 expired certificates
+CSV Contains 548 active certificate
+CSV File: ./certificates_report_ecsmcn158emsuw~1sw46hf1g0wrdc_1709679837.csv
+```
