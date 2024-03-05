@@ -9,12 +9,13 @@
 [Running the script](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#running-the-script)
 
 * [Generate CSR with subject](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#generate-csr-with-subject)
-* [List all Certificate Authorities]
-* [List all profiles for a Certificate Authority]
-* [Enroll new certificate with CSR]
-* [Enroll new certificate with PKCS #12]
-* [Certificate revocation by serial]
-* [Bulk certificate issuance]
+* [List all Certificate Authorities](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#list-all-certificate-authorities)
+* [List all profiles for a Certificate Authority](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#list-all-profiles-for-a-certificate-authority)
+* [Enroll new certificate with CSR](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#enroll-new-certificate-with-csr)
+* [Enroll new certificate with PKCS #12](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#enroll-new-certificate-with-pkcs-12)
+* [Certificate revocation by serial](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#certificate-revocation-by-serial)
+* [Bulk certificate issuance](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#bulk-certificate-issuance)
+* [Generate Report of Active Certificates](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#generate-report-of-active-certificates)
 
 
 
