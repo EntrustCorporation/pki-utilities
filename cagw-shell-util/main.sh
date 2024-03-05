@@ -207,10 +207,10 @@ get_action_type () {
 3. Reissue
 "
   ACTION_TYPE_ID=0
-  read -r ACTION_TYPE_ID
+  read -rp "Action Type: " ACTION_TYPE_ID
   while [[ ${ACTION_TYPE_ID} -lt 1 || ${ACTION_TYPE_ID} -gt 3  ]]; do
     printf '%s\n' "bad selection: ${ACTION_TYPE_ID}"
-	  read -r ACTION_TYPE_ID
+	  read -rp "Action Type: " ACTION_TYPE_ID
   done
 
   [[ ${ACTION_TYPE_ID} -eq 1 ]] && printf -v "ACTION_TYPE" "%s" "RevokeAction" && return
@@ -220,7 +220,7 @@ get_action_type () {
 get_action_reason () {
 	echo -n "Select action reason from below"
 	printf "\n"
-	echo -n "1. unspecified
+	echo "1. unspecified
 2. keyCompromise
 3. caCompromise
 4. affiliationChanged
@@ -231,10 +231,10 @@ get_action_reason () {
 "
 
   ACTION_REASON_ID=0
-  read -r ACTION_REASON_ID
+  read -rp "Action Reason: " ACTION_REASON_ID
   while [[ ${ACTION_REASON_ID} -lt 1 || ${ACTION_REASON_ID} -gt 8  ]]; do
     printf '%s\n' "bad selection: ${ACTION_REASON_ID}"
-	  read -r ACTION_REASON_ID
+	  read -rp "Action Reason: " ACTION_REASON_ID
   done
   [[ ${ACTION_REASON_ID} -eq 1 ]] && printf -v "ACTION_REASON" "%s" "unspecified" && return
   [[ ${ACTION_REASON_ID} -eq 2 ]] && printf -v "ACTION_REASON" "%s" "keyCompromise" && return
@@ -271,10 +271,10 @@ get_subject_altnames() {
   printf '%s\n' "  6. registeredID"
 
   SAN_VAR_ID=0
-  read -r SAN_VAR_ID
+  read -rp "SAN Type: " SAN_VAR_ID
   while [[ "${SAN_VAR_ID}" -lt 1 || "${SAN_VAR_ID}" -gt 6 ]]; do
     printf '%s\n' "bad selection: ${SAN_VAR_ID}"
-    read -r SAN_VAR_ID
+    read -rp "SAN Type: " SAN_VAR_ID
   done
   
   #\"der\": \"string\",
@@ -371,7 +371,7 @@ enroll_p12() {
 }
 
 main() {
-	printf '%s\n%s\n' "--------------------------" "Select the CA Gateway operation:"
+	printf '\n%s\n%s\n' "--------------------------" "Select the CA Gateway operation:"
   printf '%s\n' "  1. Generate CSR with subject (using OpenSSL)"
   printf '%s\n' "  2. List all Certificate Authorities"
   printf '%s\n' "  3. List all profiles for a Certificate Authority"
@@ -381,11 +381,12 @@ main() {
   printf '%s\n' "  7. Bulk certificate revocation"
   printf '%s\n' "  8. Fetch all active certificates"
   printf '%s\n' "  9. Exit"
-	read -r CAGW_OP
+	read -rp "Selection: " CAGW_OP
 
   case ${CAGW_OP} in
 
   1)
+    printf '%s\n' "--------------------------"
     printf '%s\n%s\n' "Enter full subject" "Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		read -r CSR_SUBJECT
 		printf '%s' "Enter key type: "
@@ -408,13 +409,14 @@ main() {
 		main
     ;;
   3)
-    prompt_for_caid
     printf '%s\n' "--------------------------"
+    prompt_for_caid
 		curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/profiles"
     printf '\n'
 		main
     ;;
   4)
+    printf '%s\n' "--------------------------"
     # Prompt for CAID
     prompt_for_caid
 
@@ -425,7 +427,7 @@ main() {
     METHOD=0
     while [[ ${METHOD} -lt 1 || ${METHOD} -gt 2 ]]; do
       printf '%s\n%s\n%s\n' "Select an enrollment type:" "  1. CSR" "  2. PKCS #12"
-      read -r METHOD
+      read -rp "Enrollment Type: " METHOD
     done
 
     [[ ${METHOD} -eq 1 ]] && enroll_csr
@@ -433,19 +435,22 @@ main() {
 		main
     ;;
   5)
+    printf '%s\n' "--------------------------"
     prompt_for_caid
     while [[ "${CERTIFICATE_SERIAL}" == "" ]]; do
 		  echo -n "Enter certificate serial number in hexadecimal format (Example: 0000000091ca4b4b136a86b718ae01a5403ce62b): "
 		  read -r CERTIFICATE_SERIAL	
     done
 		get_action_type
-		echo -n "Enter a comment about the action (optional): "
-		read -r COMMENT
+		read -rp "Enter a comment about the action (optional): " COMMENT
 		get_action_reason
-		curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions" &> /dev/null
+		curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions" 2> /dev/null
+    RESULT="${?}"
+    [[ ${RESULT} -ne 0 ]] && echo "ERROR!!"
 		main
     ;;
   6)
+    printf '%s\n' "--------------------------"
     prompt_for_caid
     prompt_for_profileID
     echo "Note, this operation requires a CSV-formatted file in the following format:"
@@ -469,7 +474,6 @@ main() {
 			read -r
 			while IFS=, read -r commonName keyLen keyAlgo
 			do 
-        [[ $(( (PROCESSED_COUNT) % 50 )) -eq 0 ]] && printf '%s\n' "Processed ${PROCESSED_COUNT} certificate requests of ${BULK_COUNT}."
 				openssl req -nodes -newkey "${keyAlgo}":"${keyLen}" -keyout "$TARGET_FOLDER/${commonName}.key" -out "$TARGET_FOLDER/${commonName}.csr" -subj "/CN=$commonName" &> /dev/null
 				sed -i 1d "${TARGET_FOLDER}/${commonName}.csr" &> /dev/null
 				sed -i '' -e '$ d' "${TARGET_FOLDER}/${commonName}.csr" &> /dev/null
@@ -482,12 +486,14 @@ main() {
 				sed 's/\\n/\r\n/g' "${TMP_FILE}" > "${TARGET_FOLDER}/${commonName}.pem"
 				rm -f TMP_FILE
         PROCESSED_COUNT=$(( PROCESSED_COUNT + 1 ))
+        [[ $(( (PROCESSED_COUNT) % 50 )) -eq 0 ]] && printf '%s\n' "Processed ${PROCESSED_COUNT} certificate requests of ${BULK_COUNT}."
 			done
 		} < "${ISSUE_CSV}"
 		printf '%s\n' "Certificates and Keys written to the folder $(readlink -f "${TARGET_FOLDER}")"
 		main
     ;;
   7)
+    printf '%s\n' "--------------------------"
     echo -n "Feature not yet available."
 		main
     ;;

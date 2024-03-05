@@ -27,8 +27,43 @@
 - List all Certificate Authorities
 - List all profiles for a Certificate Authority
 - Enroll new certificate with CSR
+- Enroll new certificate with P12
 - Certificate revocation by serial
 - Bulk certificate issuance
+- Generate report of active certificates (CSV)
+
+### Running the script
+Execute the script in a terminal which has access to the CAGW Client Credential P12.
+The script will prompt for the following information:
+
+- Path to CAGW Client Credential P12
+- Password for the CAGW Client Credential P12
+- The URL for CAGW (https://cagw.pkiaas.entrust.com/cagw by default)
+
+Sample output:
+
+```
+--------------------------
+Entrust CA Gateway Utility
+--------------------------
+Path to client credentials file (PKCS#12): entrust-cagw-rqblr8xekifien.p12
+Enter PKCS#12 file password:
+Enter CA Gateway URL (e.g. https://cagw.pkiaas.entrust.com/cagw):
+--------------------------
+CAGW P12: entrust-cagw-rqblr8xekifien.p12
+CAGW URL: https://cagw.pkiaas.entrust.com/cagw
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+```
 
 #### Generate CSR with subject
 Generate CSR with given subject.
@@ -37,8 +72,25 @@ It also massages the CSR so that the request is acceptable by CA Gateway.
 
 CA Gateway, currently requires header, footer, and nelines deleted.
 
+Sample output:
+
 ```
-Enter full subject (Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com): /CN=example.com
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+Selection: 1
+--------------------------
+Enter full subject
+Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com
+/CN=example.com
 Enter key type: rsa
 Enter key length: 2048
 Where would you like to store the key (e.g. /tmp/example.key): ./example.key
@@ -49,61 +101,238 @@ Where would you like to store the CSR (e.g. /tmp/example.csr): ./example.csr
 Fetches all the Certificate Authorities as configured on a given CA Gateway instance.
 
 Requires CA Gateway credentials for authenticating requests.
+Prints out a list of Certificate Authorities.
+
+Sample output:
 
 ```
-Path to client credentials file (PKCS#12): <Path to p12 file downloaded from ECS>
-Enter PKCS#12 file password: <P12 password>
-Enter CA Gateway URL (e.g. https://CAGW-Host/cagw): <CAGW URL>
-# Select option 2 list all CA Gateway supported CAs
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+Selection: 2
+--------------------------
+{
+  "type" : "CAListResponse",
+  "caList" : [ {
+    "id" : "ecsmcn158emsuw~1sw46hf1g0wrdc",
+    "name" : "pkiaas prod env connection: ecsmcn158emsuw~1sw46hf1g0wrdc",
+    "properties" : {
+      "connector-name" : "com.entrust.PKIHub",
+      "type" : "PKIaaS Certificate Authority"
+    },
+    "chain" : [ ]
+  }, {
+    "id" : "ecsmcn158emsuw~mrajwn1pklzxjb",
+    "name" : "pkiaas prod env connection: ecsmcn158emsuw~mrajwn1pklzxjb",
+    "properties" : {
+      "connector-name" : "com.entrust.PKIHub",
+      "type" : "PKIaaS Certificate Authority"
+    },
+    "chain" : [ ]
+  } ]
+}
 ```
 
 #### List all profiles for a Certificate Authority
 Fetches all the Certificate Profiles configured for a give Certificate Authority.
 
 Requires CA Gateway credentials for authenticating requests.
+Prints a list of Certificate Profiles supported on the selected Certificate Authority.
 
 ```
-Path to client credentials file (PKCS#12): <Path to p12 file downloaded from ECS>
-Enter PKCS#12 file password: <P12 password>
-Enter CA Gateway URL (e.g. https://CAGW-Host/cagw): <CAGW URL>
-Enter CA ID: <Get the CA ID using option 2>
-# Select option 3 list all CA Certificate Profiles
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+Selection: 3
+--------------------------
+Select a CA ID:
+1. Issuing-CA: ecsmcn158emsuw~1sw46hf1g0wrdc (CN=Example Issuing)
+2. Root-CA: ecsmcn158emsuw~mrajwn1pklzxjb (CN=Example Root)
+Enter CA ID [ecsmcn158emsuw~mrajwn1pklzxjb]: 2
+--------------------------
+{
+  "message" : {
+    "message" : "Profiles retrieved successfully.",
+    "details" : [ ]
+  },
+  "profiles" : [ {
+    "id" : "basic-ca-subord",
+    "name" : "basic-ca-subord",
+    "properties" : {
+      "cert_lifetime" : "87600h0m0s",
+      "issue_ca_certificate" : "true",
+      "key_client_generated" : "true",
+      "key_usage" : "digital signature, cert sign, crl sign"
+    },
+    "protocols" : [ ],
+    "requestedProperties" : [ ],
+    "subjectAltNameRequirements" : [ ],
+    "subjectVariableRequirements" : [ ]
+  } ],
+  "type" : "ProfilesResponse"
+}
 ```
 
 #### Enroll new certificate with CSR
-Using a CSR generated via this script or any other external tool, use this option to send that certificate signing request to CA Gateway and get signed certificate back in PEM encoded format. 
 
-You can optionally add Subject Altnames to the request.
+Submit an enrollment request using a pre-generated CSR file. The user will be prompted to select the desired Certificate Authority and the desired Certificate Profile.
+
+The resulting certificate will be saved to the user-defined path.
+
+You can optionally add multiple Subject Altnames to the request.
+
+Sample output:
+
 ```
-Enter CA ID []: <Get the CA ID using option 2>
-Enter certificate profile ID []: <Get the CA ID using option 3>
-Enter path of the CSR file []: <CSR generated using external tool or using option 1>
-Where would you like to store the certificate (e.g. /tmp/certificate.pem): <path where you want cert to be saved>
-Enter full subject DN: <subject DN of the cert to be issued. e.g. cn=example.com>
-Do you want to enter a Subject Alternate Name (Y/N): Y
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+Selection: 4
+--------------------------
+Select a CA ID:
+1. Issuing-CA: ecsmcn158emsuw~1sw46hf1g0wrdc (CN=Example Issuing)
+2. Root-CA: ecsmcn158emsuw~mrajwn1pklzxjb (CN=Example Root)
+Enter CA ID []: 1
+Select a Profile ID:
+1. mdmws-digital-signature
+2. mdmws-digital-signature-key-encipherment
+3. mdmws-digital-signature-key-encipherment-clientauth
+4. mdmws-key-encipherment
+5. mdmws-non-repudiation
+Enter Profile ID []: 3
+Select an enrollment type:
+  1. CSR
+  2. PKCS #12
+Enrollment Type: 1
+Enter path to an existing CSR file ['']: ./example.csr
+Where would you like to store the certificate (e.g. /tmp/certificate.pem): ./example.crt
+Enter full subject DN: cn=example.com
+Do you want to add a Subject Alternate Name (Y/N): y
 Select the SAN attribute to be added from the list
-1. rfc822Name
-2. dNSName
-3. directoryName
-4. uniformResourceIdentifier
-5. iPAddress
-6. registeredID
-5
-Enter value of the selected SAN attribute: 1.1.1.1
+  1. rfc822Name
+  2. dNSName
+  3. directoryName
+  4. uniformResourceIdentifier
+  5. iPAddress
+  6. registeredID
+SAN Type: 2
+Enter value of the selected SAN attribute (dNSName): example.com
+Do you want to add a Subject Alternate Name (Y/N): n
+
+Certificate is written successfully to the file ./example.crt.
+```
+
+#### Enroll new certificate with PKCS #12
+Submit an enrollment request without requiring a CSR. CAGW will generate a private key and a certificate in a password protected P12 file. The user will be prompted to select the desired Certificate Authority, Certificate Profile, and password to secure the P12 file.
+
+The resulting certificate will be saved to the user-defined path.
+
+You can optionally add multiple Subject Altnames to the request.
+
+Sample output:
+
+```
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+Selection: 4
+--------------------------
+Select a CA ID:
+1. Issuing-CA: ecsmcn158emsuw~1sw46hf1g0wrdc (CN=Example Issuing)
+2. Root-CA: ecsmcn158emsuw~mrajwn1pklzxjb (CN=Example Root)
+Enter CA ID [ecsmcn158emsuw~1sw46hf1g0wrdc]: 1
+Select a Profile ID:
+1. mdmws-digital-signature
+2. mdmws-digital-signature-key-encipherment
+3. mdmws-digital-signature-key-encipherment-clientauth
+4. mdmws-key-encipherment
+5. mdmws-non-repudiation
+Enter Profile ID []: 3
+Select an enrollment type:
+  1. CSR
+  2. PKCS #12
+Enrollment Type: 2
+Enter a password to secure the P12 file:
+Where would you like to store the certificate (e.g. /tmp/certificate.pem): ./example.p12
+Enter full subject DN: cn=example.com
+Do you want to add a Subject Alternate Name (Y/N): y
+Select the SAN attribute to be added from the list
+  1. rfc822Name
+  2. dNSName
+  3. directoryName
+  4. uniformResourceIdentifier
+  5. iPAddress
+  6. registeredID
+SAN Type: 2
+Enter value of the selected SAN attribute (dNSName): example.com
+Do you want to add a Subject Alternate Name (Y/N): n
+
+Certificate is written successfully to the file ./example.p12.
+
 ```
 
 #### Certificate revocation by serial
 Revoke/renew/reissue certificate using the certificate's serial number.
 
+Sample output:
+
 ```
-Enter CA ID: <Get the CA ID using option 2>
-Enter certificate serial number (Example: 00112233): <cert serial number>
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+Selection: 5
+--------------------------
+Select a CA ID:
+1. Issuing-CA: ecsmcn158emsuw~1sw46hf1g0wrdc (CN=Example Issuing)
+2. Root-CA: ecsmcn158emsuw~mrajwn1pklzxjb (CN=Example Root)
+Enter CA ID []: 1
+Enter certificate serial number in hexadecimal format (Example: 0000000091ca4b4b136a86b718ae01a5403ce62b): 0000000091ca4b4b136a86b718ae01a5403ce62b
 Select action type from below
 1. Revoke
 2. Renew
 3. Reissue
-1
-Enter a comment about the action: some comment
+Action Type: 1
+Enter a comment about the action (optional):
 Select action reason from below
 1. unspecified
 2. keyCompromise
@@ -113,24 +342,75 @@ Select action reason from below
 6. cessationOfOperation
 7. certificateHold
 8. privilegeWithdrawn
-2
+
+Action Reason: 1
+{
+  "type" : "ActionResponse",
+  "action" : {
+    "type" : "RevokeAction",
+    "id" : "98c1a818-0896-4dac-bab1-4315da5554d1",
+    "properties" : { },
+    "comment" : "",
+    "status" : "COMPLETED",
+    "succeedIfAlreadyInRequestedState" : true,
+    "reason" : "unspecified",
+    "compromiseDate" : "2024-03-05T22:43:23.429157524Z"
+  }
+}
 ```
 
 #### Bulk certificate issuance
-Using a CSV file to generate keys and certs in bulk.
+Use a CSV file to generate keys and certs in bulk.
 
-Sample CSV file as below -
+Sample CSV file must have the data arranged in the following format **without headers**.
 
 | commonName | keyLen | keyAlgo |
 | --- | --- | --- |
 | example.com | 2048 | rsa |
 | myorg.com | 2048 | rsa |
 
+See below for an excerpt of a valid CSV file:
+
 ```
-Enter CA ID []: <Get the CA ID using option 2>
-Enter certificate profile ID []: <Get the CA ID using option 3>
-Enter key type: rsa
-Enter key length: 2048
-Enter the path to the CSV file: ./bulkIssue.csv
-Enter the path for saving keys and certs: /tmp/certs
+example.com,2048,rsa
+abc.corp,2048,rsa
 ```
+
+Sample output:
+
+```
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+Selection: 6
+--------------------------
+Select a CA ID:
+1. Issuing-CA: ecsmcn158emsuw~1sw46hf1g0wrdc (CN=Example Issuing)
+2. Root-CA: ecsmcn158emsuw~mrajwn1pklzxjb (CN=Example Root)
+Enter CA ID []: 1
+Select a Profile ID:
+1. mdmws-digital-signature
+2. mdmws-digital-signature-key-encipherment
+3. mdmws-digital-signature-key-encipherment-clientauth
+4. mdmws-key-encipherment
+5. mdmws-non-repudiation
+Enter Profile ID []: 3
+Note, this operation requires a CSV-formatted file in the following format:
+Common Name, Key Algorithm, Key Size
+For example:
+example common name, rsa, 4096
+Enter the path to the CSV file: ./bulk.csv
+Enter the path for saving keys and certs: /tmp
+Processing list of 2 bulk certificate enrollments...
+Certificates and Keys written to the folder /tmp
+```
+
+
