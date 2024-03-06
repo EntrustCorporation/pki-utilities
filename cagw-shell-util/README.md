@@ -17,6 +17,7 @@
 * [Enroll new certificate with PKCS #12](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#enroll-new-certificate-with-pkcs-12)
 * [Certificate revocation by serial](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#certificate-revocation-by-serial)
 * [Bulk certificate issuance](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#bulk-certificate-issuance)
+* [Bulk certificate revocation](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#bulk-certificate-revocation)
 * [Generate Report of Active Certificates](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#generate-report-of-active-certificates)
 
 ### Prerequisites
@@ -403,7 +404,7 @@ Sample CSV file must have the data arranged in the following format **without he
 | commonName | keyLen | keyAlgo |
 | --- | --- | --- |
 | example.com | 2048 | rsa |
-| myorg.com | 2048 | rsa |
+| abc.corp | 2048 | rsa |
 
 See below for an excerpt of a valid CSV file:
 
@@ -447,6 +448,86 @@ Enter the path to the CSV file: ./bulk.csv
 Enter the path for saving keys and certs: /tmp
 Processing list of 2 bulk certificate enrollments...
 Certificates and Keys written to the folder /tmp
+```
+
+[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+
+#### Bulk certificate revocation
+Revoke a list of certificates using a CSV File.
+The contents of the CSV file must contain serial numbers in the 2nd column. For example, the following structure is valid
+
+| commonName | serialNumber
+| --- | --- |
+| example.com | 00000000dc517fb9b9c3eb3b890ff2a34812e33c |
+| abc.corp | 0000000011ddbf8d7346f20834769f7a8ffc43ca |
+
+See below for an excerpt of a valid CSV file:
+
+```
+example.com,00000000dc517fb9b9c3eb3b890ff2a34812e33c
+abc.corp,0000000011ddbf8d7346f20834769f7a8ffc43ca
+```
+
+Sample output:
+
+```
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Fetch all active certificates
+  9. Exit
+Selection: 7
+--------------------------
+Enter the path to the CSV file: revoke.csv
+Select a CA ID:
+1. Issuing-CA: ecsmcn158emsuw~1sw46hf1g0wrdc (CN=Assaly Issuing)
+2. Root-CA: ecsmcn158emsuw~mrajwn1pklzxjb (CN=Assaly Root)
+Enter CA ID []: 1
+Does the CSV File contain a row of headers (Y/N): n
+Select action reason from below
+1. unspecified
+2. keyCompromise
+3. caCompromise
+4. affiliationChanged
+5. superseded
+6. cessationOfOperation
+7. certificateHold
+8. privilegeWithdrawn
+
+Action Reason: 2
+REVOKE SN : 00000000dc517fb9b9c3eb3b890ff2a34812e33c
+{
+  "type" : "ActionResponse",
+  "action" : {
+    "type" : "RevokeAction",
+    "id" : "57013ff6-ab6d-4a4a-a277-ea03100ae48e",
+    "properties" : { },
+    "comment" : "",
+    "status" : "COMPLETED",
+    "succeedIfAlreadyInRequestedState" : true,
+    "reason" : "keyCompromise",
+    "compromiseDate" : "2024-03-06T12:48:02.293536733Z"
+  }
+}REVOKE SN : 0000000011ddbf8d7346f20834769f7a8ffc43ca
+{
+  "type" : "ActionResponse",
+  "action" : {
+    "type" : "RevokeAction",
+    "id" : "b02f3a7c-7e30-467f-90e3-fb123884c170",
+    "properties" : { },
+    "comment" : "",
+    "status" : "COMPLETED",
+    "succeedIfAlreadyInRequestedState" : true,
+    "reason" : "keyCompromise",
+    "compromiseDate" : "2024-03-06T12:48:02.681390364Z"
+  }
+}
 ```
 
 [return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)

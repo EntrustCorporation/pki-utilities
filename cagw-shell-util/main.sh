@@ -135,7 +135,7 @@ sanitize_cert_events () {
   TOTAL_EVENT_COUNT=$(( (FILECOUNT * 50) + TOTAL_EVENT_COUNT ))
   #Done calculation of total events (needed to print out the final stats at the end)
 
-  printf '%s\n' "Removing expired certificate entries..."
+  printf '%s\n' "Removing revoked certificate entries..."
   FILECOUNT=1
   JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
   REVOKED_SN_COUNT=${#REVOKED_SN_LIST[@]}
@@ -236,14 +236,14 @@ get_action_reason () {
     printf '%s\n' "bad selection: ${ACTION_REASON_ID}"
 	  read -rp "Action Reason: " ACTION_REASON_ID
   done
-  [[ ${ACTION_REASON_ID} -eq 1 ]] && printf -v "ACTION_REASON" "%s" "unspecified" && return
-  [[ ${ACTION_REASON_ID} -eq 2 ]] && printf -v "ACTION_REASON" "%s" "keyCompromise" && return
-  [[ ${ACTION_REASON_ID} -eq 3 ]] && printf -v "ACTION_REASON" "%s" "caCompromise" && return
-  [[ ${ACTION_REASON_ID} -eq 4 ]] && printf -v "ACTION_REASON" "%s" "affiliationChanged" && return
-  [[ ${ACTION_REASON_ID} -eq 5 ]] && printf -v "ACTION_REASON" "%s" "superseded" && return
-  [[ ${ACTION_REASON_ID} -eq 6 ]] && printf -v "ACTION_REASON" "%s" "cessationOfOperation" && return
-  [[ ${ACTION_REASON_ID} -eq 7 ]] && printf -v "ACTION_REASON" "%s" "certificateHold" && return
-  [[ ${ACTION_REASON_ID} -eq 8 ]] && printf -v "ACTION_REASON" "%s" "privilegeWithdrawn" && return
+  [[ ${ACTION_REASON_ID} -eq 1 ]] && export ACTION_REASON="unspecified" && return
+  [[ ${ACTION_REASON_ID} -eq 2 ]] && export ACTION_REASON="keyCompromise" && return
+  [[ ${ACTION_REASON_ID} -eq 3 ]] && export ACTION_REASON="caCompromise" && return
+  [[ ${ACTION_REASON_ID} -eq 4 ]] && export ACTION_REASON="affiliationChanged" && return
+  [[ ${ACTION_REASON_ID} -eq 5 ]] && export ACTION_REASON="superseded" && return
+  [[ ${ACTION_REASON_ID} -eq 6 ]] && export ACTION_REASON="cessationOfOperation" && return
+  [[ ${ACTION_REASON_ID} -eq 7 ]] && export ACTION_REASON="certificateHold" && return
+  [[ ${ACTION_REASON_ID} -eq 8 ]] && export ACTION_REASON="privilegeWithdrawn" && return
 }
 get_subject_altnames() {
 	echo -n "Do you want to add a Subject Alternate Name (Y/N): "
@@ -494,7 +494,54 @@ main() {
     ;;
   7)
     printf '%s\n' "--------------------------"
-    echo -n "Feature not yet available."
+    REVOKE_CSV=""
+    while [[ ! -f "${REVOKE_CSV}" ]]; do
+		  echo -n "Enter the path to the CSV file: "
+		  read -r REVOKE_CSV
+    done
+    prompt_for_caid
+    HEADERS_INCLUDED=""
+    read -rp "Does the CSV File contain a row of headers (Y/N): " HEADERS_INCLUDED
+    HEADERS_INCLUDED=$(echo "$HEADERS_INCLUDED" | tr '[:lower:]' '[:upper:]')
+    while [[ "${HEADERS_INCLUDED}" != "Y" && "${HEADERS_INCLUDED}" != "N" ]]; do
+      printf '%s\n' "bad selection: ${HEADERS_INCLUDED}"
+      read -rp "Does the CSV File contain a row of headers (Y/N): " HEADERS_INCLUDED
+      HEADERS_INCLUDED=$(echo "$HEADERS_INCLUDED" | tr '[:lower:]' '[:upper:]')
+    done
+    get_action_reason
+    [[ "${HEADERS_INCLUDED}" == "Y" ]] && export headers=0
+    [[ "${HEADERS_INCLUDED}" == "N" ]] && export headers=1
+    OLDIFS=$IFS
+    IFS=','
+    snToRevoke=0
+    while read dummy1 sn dummy2; do
+      if test "$headers" == "0"; then
+        headers=1
+        continue
+      fi
+      if test "$snToRevoke" != "0"; then
+        echo "REVOKE SN : $snToRevoke"
+        curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 \
+          --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions"
+        res=$?
+        if test "$res" != "0"; then
+          echo "ERROR!!!: $res"
+        fi
+      fi
+      snToRevoke=$(printf '%s' "$sn" | tr -d '\r')
+
+    done <$REVOKE_CSV
+
+    echo "REVOKE SN : $snToRevoke"
+    curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\",\"issueCrl\":\"true\"}}" \
+      --cert-type P12 --cert "$P12":"$P12_PWD" $CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions
+    res=$?
+    if test "$res" != "0"; then
+      echo "ERROR!!!: $res"
+    fi
+
+    IFS=$OLDIFS
+
 		main
     ;;
   8)
