@@ -19,7 +19,7 @@ get_client_credentials() {
   while [[ ${RESULT} -ne 0 ]]; do
     printf '%s' "Enter PKCS#12 file password: "
     read -sr P12_PWD
-    openssl pkcs12 -in "${P12}" -password pass:"${P12_PWD}" -nokeys > /dev/null
+    openssl pkcs12 -legacy -in "${P12}" -password pass:"${P12_PWD}" -nokeys > /dev/null
     RESULT=$?
   done
   
@@ -32,6 +32,8 @@ get_client_credentials() {
     read -rp "CAGW Type: " CAGW_TYPE
     [[ ${CAGW_TYPE} -lt 1 || ${CAGW_TYPE} -gt 2 ]] && echo "bad selection ${CAGW_TYPE}"
   done
+  [[ "${CAGW_TYPE}" -eq 1 ]] && export PAGE_SIZE=50
+  [[ "${CAGW_TYPE}" -eq 2 ]] && export PAGE_SIZE=100
 
   CAGW_REGION=0
   if [[ "${CAGW_TYPE}" -eq 1 ]]; then
@@ -143,9 +145,9 @@ sanitize_cert_events () {
   FILENAME="${1}"
   FILECOUNT=1
   JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
-  REVOKED_SN_LIST=()
 
   echo "Searching for revoked certificate events..."
+  REVOKED_SN_LIST=()
   while [[ -f "${JSON_FILENAME}" ]]; do
     while read -r line; do REVOKED_SN_LIST+=("$line"); done < <(jq -r --arg status "revoked" '.[] | select(.action == $status) | ."serialNumber"' "${JSON_FILENAME}")
     FILECOUNT=$(( FILECOUNT + 1 ))
@@ -157,21 +159,22 @@ sanitize_cert_events () {
   JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
   FILECOUNT=$(( FILECOUNT - 1 ))
   TOTAL_EVENT_COUNT=$(jq -r '. | length' "${JSON_FILENAME}")
-  TOTAL_EVENT_COUNT=$(( (FILECOUNT * 50) + TOTAL_EVENT_COUNT ))
+  TOTAL_EVENT_COUNT=$(( (FILECOUNT * PAGE_SIZE) + TOTAL_EVENT_COUNT ))
   #Done calculation of total events (needed to print out the final stats at the end)
 
-  printf '%s\n' "Removing revoked certificate entries..."
-  FILECOUNT=1
-  JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
-  REVOKED_SN_COUNT=${#REVOKED_SN_LIST[@]}
+  REVOKED_SN_COUNT="${#REVOKED_SN_LIST[@]}"
+  printf '%s\n' "Removing ${REVOKED_SN_COUNT} revoked certificate entries..."
   for (( i = 0 ; i < REVOKED_SN_COUNT ; i++ )); do
+    FILECOUNT=1
+    JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
     while [[ -f "${JSON_FILENAME}" ]]; do
-      SANITIZED=$(jq -r --arg sn "${REVOKED_SN_LIST[$i]}" 'del(.[] | select(."serialNumber" == $sn))' "${JSON_FILENAME}")
+      SN="${REVOKED_SN_LIST[${i}]}"
+      SANITIZED=$(jq -r --arg sn "${SN}" 'del(.[] | select(."serialNumber" == $sn))' "${JSON_FILENAME}")
       echo "${SANITIZED}" > "${JSON_FILENAME}"
-      [[ $(( (i+1) % 50 )) -eq 0 ]] && printf '%s\n' "Removed $(( (i+1) * 2 )) of $(( REVOKED_SN_COUNT * 2 )) revoked certificate events."
       FILECOUNT=$(( FILECOUNT + 1 ))
       JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
     done
+    [[ $(( (i+1) % (REVOKED_SN_COUNT / 10) )) -eq 0 ]] && printf '%s\n' "Removed $(( (i+1) * 2 )) of $(( REVOKED_SN_COUNT * 2 )) revoked certificate events."
   done
   
   #Calculate number certificate events remaining after removing revoked certificates
@@ -349,6 +352,7 @@ enroll_csr() {
 
   # Execute Curl Command
   RESPONSE=$(curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < "$CSR_INPUT_PATH")\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert "$P12":"$P12_PWD" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>/dev/null)
+  printf '%s\n%s\n' "Response:" "${RESPONSE}"
   cert_raw=$( echo "${RESPONSE}" | jq '.enrollment.body')
   var1=${cert_raw%?}
   var2=${var1:1}
@@ -392,6 +396,7 @@ enroll_p12() {
 }
 
 main() {
+
 	printf '\n%s\n%s\n' "--------------------------" "Select the CA Gateway operation:"
   printf '%s\n' "  1. Generate CSR with subject (using OpenSSL)"
   printf '%s\n' "  2. List all Certificate Authorities"
@@ -401,7 +406,8 @@ main() {
   printf '%s\n' "  6. Bulk certificate issuance"
   printf '%s\n' "  7. Bulk certificate revocation"
   printf '%s\n' "  8. Fetch all active certificates"
-  printf '%s\n' "  9. Exit"
+  printf '%s\n' "  9. Revoke Certificates by Subject DN (On-Premises CAGW Only)"
+  printf '%s\n' "  10. Exit"
 	read -rp "Selection: " CAGW_OP
 
   case ${CAGW_OP} in
@@ -501,7 +507,7 @@ main() {
 				sed 's/\\n/\r\n/g' "${TMP_FILE}" > "${TARGET_FOLDER}/${commonName}.pem"
 				rm -f TMP_FILE
         PROCESSED_COUNT=$(( PROCESSED_COUNT + 1 ))
-        [[ $(( (PROCESSED_COUNT) % 50 )) -eq 0 ]] && printf '%s\n' "Processed ${PROCESSED_COUNT} certificate requests of ${BULK_COUNT}."
+        [[ $(( (PROCESSED_COUNT) % PAGE_SIZE )) -eq 0 ]] && printf '%s\n' "Processed ${PROCESSED_COUNT} certificate requests of ${BULK_COUNT}."
 			done
 		} < "${ISSUE_CSV}"
 		printf '%s\n' "Certificates and Keys written to the folder $(readlink -f "${TARGET_FOLDER}")"
@@ -567,7 +573,7 @@ main() {
     printf '%s\n' '"Action","Event Date","Certificate","Serial Number"' > "${CSV_FILENAME}"
     # Run initial CURL command to fetch first page of certificates
     printf '\n%s\n' "Fetching list of certificate events..."
-    CURL_OUTPUT=$(curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=50&startDate=2000-01-01T00:00:00.00Z"  2>/dev/null)
+    CURL_OUTPUT=$(curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=2024-01-01T00:00:00.00Z"  2>/dev/null)
     NEXT_PAGE_INDEX=$(echo "${CURL_OUTPUT}" | jq -r '.nextPageIndex')
     MORE_PAGES=$(echo "${CURL_OUTPUT}" | jq -r '.morePages')
     TOTAL_CERT_EVENTS=$(echo "${CURL_OUTPUT}" | jq -r '.events | length')
@@ -576,21 +582,36 @@ main() {
     JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
     echo "${CURL_OUTPUT}" | jq '.events' > "${JSON_FILENAME}"
 
-    echo "CAGW API requests to fetch certificate events are limited to 50 events per page when using PKIaaS."
+    [[ ${CAGW_TYPE} -eq 1 ]] && echo "CAGW API requests to fetch certificate events are limited to 50 events per page when using PKIaaS."
     while [[ ${MORE_PAGES} == "true" ]]; do
-      echo "Fetched ${TOTAL_CERT_EVENTS}. Fetching next batch of 50 certificate events."
-      CURL_OUTPUT=$(curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=50&startDate=2000-01-01T00:00:00.00Z&nextPageIndex=$NEXT_PAGE_INDEX"  2>/dev/null)
+      echo "Fetched ${TOTAL_CERT_EVENTS}. Fetching next batch of ${PAGE_SIZE} certificate events."
+      CURL_OUTPUT=$(curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=2000-01-01T00:00:00.00Z&nextPageIndex=$NEXT_PAGE_INDEX"  2>/dev/null)
       NEXT_PAGE_INDEX=$(echo "${CURL_OUTPUT}" | jq -r '.nextPageIndex')
       MORE_PAGES=$(echo "${CURL_OUTPUT}" | jq -r '.morePages')
       TOTAL_CERT_EVENTS=$(( TOTAL_CERT_EVENTS + $(echo "${CURL_OUTPUT}" | jq -r '.events | length') ))
       FILECOUNT=$(( FILECOUNT + 1 ))
       JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
       echo "${CURL_OUTPUT}" | jq -r '.events' > "${JSON_FILENAME}"
+      unset CURL_OUTPUT
     done
     sanitize_cert_events "${FILENAME}"
 		main
     ;;
   9)
+    printf '%s\n' "--------------------------"
+    [[ "${CAGW_TYPE}" -eq 1 ]] && echo "The CAGW API for PKIaaS does not support this feature." && main
+    prompt_for_caid
+    SUBJECT_DN=""
+    while [[ -z "${SUBJECT_DN// }" ]]; do 
+      read -rp "Subject DN: " SUBJECT_DN
+    done
+    get_action_type
+		read -rp "Enter a comment about the action (optional): " COMMENT
+		get_action_reason
+    curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD"  --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" "$CAGW_URL/v1/certificate-authorities/$CAID/subjects/$(printf '%s' "${SUBJECT_DN}" | jq -sRr @uri)/actions"  2>/dev/null
+    main
+    ;;
+  10)
     exit
     ;;
   *)
