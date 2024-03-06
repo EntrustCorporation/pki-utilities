@@ -260,8 +260,8 @@ Select an enrollment type:
   2. PKCS #12
 Enrollment Type: 1
 Enter path to an existing CSR file ['']: ./example.csr
-Where would you like to store the certificate (e.g. /tmp/certificate.pem): ./example.crt
-Enter full subject DN: cn=example.com
+Where would you like to store the certificate (e.g. ./certificate.pem): ./example.crt
+Enter full subject DN (i.e. cn=example.com): cn=example.com
 Do you want to add a Subject Alternate Name (Y/N): y
 Select the SAN attribute to be added from the list
   1. rfc822Name
@@ -318,8 +318,8 @@ Select an enrollment type:
   2. PKCS #12
 Enrollment Type: 2
 Enter a password to secure the P12 file:
-Where would you like to store the certificate (e.g. /tmp/certificate.pem): ./example.p12
-Enter full subject DN: cn=example.com
+Where would you like to store the certificate (e.g. ./certificate.p12): ./example.p12
+Enter full subject DN (i.e. cn=example.com): cn=example.com
 Do you want to add a Subject Alternate Name (Y/N): y
 Select the SAN attribute to be added from the list
   1. rfc822Name

@@ -310,14 +310,14 @@ enroll_csr() {
   # Prompt for Certificate File Path
   CERT_PATH=""
   while [[ "${CERT_PATH}" == "" ]]; do
-    echo -n "Where would you like to store the certificate (e.g. /tmp/certificate.pem): "
+    echo -n "Where would you like to store the certificate (e.g. ./certificate.pem): "
     read -r CERT_PATH
   done
 
   # Prompt for Certificate Subject DN
   CERT_OPT_PARAMS_SUBJECT_DN=""
   while [[ "${CERT_OPT_PARAMS_SUBJECT_DN}" == "" ]]; do
-    echo -n "Enter full subject DN: "
+    echo -n "Enter full subject DN (i.e. cn=example.com): "
     read -r CERT_OPT_PARAMS_SUBJECT_DN
   done
 
@@ -349,14 +349,14 @@ enroll_p12() {
   # Prompt for Certificate File Path
   CERT_PATH=""
   while [[ "${CERT_PATH}" == "" ]]; do
-    echo -n "Where would you like to store the certificate (e.g. /tmp/certificate.pem): "
+    echo -n "Where would you like to store the certificate (e.g. ./certificate.p12): "
     read -r CERT_PATH
   done
 
   # Prompt for Certificate Subject DN
   CERT_OPT_PARAMS_SUBJECT_DN=""
   while [[ "${CERT_OPT_PARAMS_SUBJECT_DN}" == "" ]]; do
-    echo -n "Enter full subject DN: "
+    echo -n "Enter full subject DN (i.e. cn=example.com): "
     read -r CERT_OPT_PARAMS_SUBJECT_DN
   done
 
