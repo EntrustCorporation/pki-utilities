@@ -9,8 +9,7 @@ get_client_credentials() {
   P12=""
   # Continuously ask for P12 filepath until a valid filepath has been provided
   while [[ ! -f "${P12}" ]]; do
-    printf '%s' "Path to client credentials file (PKCS#12): "
-    read -r P12
+    read -e -rp "Path to client credentials file (PKCS#12): " P12
     [[ ! -f "${P12}" ]] && printf '%s\n' "Path invalid"
   done
 
@@ -298,11 +297,9 @@ get_subject_altnames() {
 enroll_csr() {
   # Prompt for CSR File Path
   while [[ ! -f "${CSR_INPUT_PATH}" ]]; do
-    echo -n "Enter path to an existing CSR file ['$CSR_PATH']: "
-    read -r CSR_INPUT_PATH
+    read -e -rp "Enter path to an existing CSR file ['$CSR_PATH']: " CSR_INPUT_PATH
     while [[ -z "$CSR_INPUT_PATH" ]] && [[ -z "${CSR_PATH}" ]]; do
-      echo -n "Enter path to an existing CSR file ['$CSR_PATH']: "
-      read -r CSR_INPUT_PATH
+      read -e -rp "Enter path to an existing CSR file ['$CSR_PATH']: " CSR_INPUT_PATH
     done
     [[ -z "$CSR_INPUT_PATH" ]] &&  printf -v "CSR_INPUT_PATH" "%s" "$CSR_PATH"
   done
@@ -310,8 +307,7 @@ enroll_csr() {
   # Prompt for Certificate File Path
   CERT_PATH=""
   while [[ "${CERT_PATH}" == "" ]]; do
-    echo -n "Where would you like to store the certificate (e.g. ./certificate.pem): "
-    read -r CERT_PATH
+    read -e -rp "Where would you like to store the certificate (e.g. ./certificate.pem): " CERT_PATH
   done
 
   # Prompt for Certificate Subject DN
@@ -349,8 +345,7 @@ enroll_p12() {
   # Prompt for Certificate File Path
   CERT_PATH=""
   while [[ "${CERT_PATH}" == "" ]]; do
-    echo -n "Where would you like to store the certificate (e.g. ./certificate.p12): "
-    read -r CERT_PATH
+    read -e -rp "Where would you like to store the certificate (e.g. ./certificate.p12): " CERT_PATH
   done
 
   # Prompt for Certificate Subject DN
@@ -389,14 +384,10 @@ main() {
     printf '%s\n' "--------------------------"
     printf '%s\n%s\n' "Enter full subject" "Example: /C=CA/ST=Ontario/L=Ottawa/O=My Org/OU=IT/CN=example.com"
 		read -r CSR_SUBJECT
-		printf '%s' "Enter key type: "
-		read -r KEY_TYPE
-		printf '%s' "Enter key length: "
-		read -r KEY_LEN
-		printf '%s' "Where would you like to store the key (e.g. /tmp/example.key): "
-		read -r KEY_PATH
-		printf '%s' "Where would you like to store the CSR (e.g. /tmp/example.csr): "
-		read -r CSR_PATH
+		read -rp "Enter key type: " KEY_TYPE
+		read -rp "Enter key length: " KEY_LEN
+    read -e -rp "Where would you like to store the key (e.g. /tmp/example.key): " KEY_PATH
+    read -e -rp "Where would you like to store the CSR (e.g. /tmp/example.csr): " CSR_PATH
 		openssl req -nodes -newkey "$KEY_TYPE":"$KEY_LEN" -keyout "$KEY_PATH" -out "$CSR_PATH" -subj "$CSR_SUBJECT" &> /dev/null
 		sed -i 1d "$CSR_PATH" &> /dev/null
 		sed -i '' -e '$ d' "$CSR_PATH" &> /dev/null
@@ -459,13 +450,11 @@ main() {
     echo "example common name, rsa, 4096"
     ISSUE_CSV=""
     while [[ ! -f "${ISSUE_CSV}" ]]; do
-		  echo -n "Enter the path to the CSV file: "
-		  read -r ISSUE_CSV
+		  read  -e -rp "Enter the path to the CSV file: " ISSUE_CSV
     done
     TARGET_FOLDER=""
     while [[ ! -d "${TARGET_FOLDER}" ]]; do
-		  echo -n "Enter the path for saving keys and certs: "
-		  read -r TARGET_FOLDER
+		  read -e -rp "Enter the path for saving keys and certs: " TARGET_FOLDER
     done
     BULK_COUNT=$(wc -l < "${ISSUE_CSV}" | tr -d ' ')
     PROCESSED_COUNT=0
@@ -496,8 +485,7 @@ main() {
     printf '%s\n' "--------------------------"
     REVOKE_CSV=""
     while [[ ! -f "${REVOKE_CSV}" ]]; do
-		  echo -n "Enter the path to the CSV file: "
-		  read -r REVOKE_CSV
+		  read -e -rp  "Enter the path to the CSV file: " REVOKE_CSV
     done
     prompt_for_caid
     HEADERS_INCLUDED=""
