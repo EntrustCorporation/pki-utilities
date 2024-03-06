@@ -494,8 +494,8 @@ Selection: 7
 --------------------------
 Enter the path to the CSV file: revoke.csv
 Select a CA ID:
-1. Issuing-CA: ecsmcn158emsuw~1sw46hf1g0wrdc (CN=Assaly Issuing)
-2. Root-CA: ecsmcn158emsuw~mrajwn1pklzxjb (CN=Assaly Root)
+1. Issuing-CA: ecsmcn158emsuw~1sw46hf1g0wrdc (CN=Example Issuing)
+2. Root-CA: ecsmcn158emsuw~mrajwn1pklzxjb (CN=Example Root)
 Enter CA ID []: 1
 Does the CSV File contain a row of headers (Y/N): n
 Select action reason from below
