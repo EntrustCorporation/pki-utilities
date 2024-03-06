@@ -476,6 +476,17 @@ example.com,00000000dc517fb9b9c3eb3b890ff2a34812e33c
 abc.corp,0000000011ddbf8d7346f20834769f7a8ffc43ca
 ```
 
+For PKIaaS Certificate Authorities, the CSV file can be automatically generated using the ECS Portal. To generate the CSV file from ECS Portal:
+
+- To export certificates on **ECS Enterprise Portal**:
+
+    | Step | Description |
+    | --- | --- |
+    | 1. | Go to **Certificates > Managed Certificates > PKIaaS Certificates**. |
+    | 2. | Select one or more certificates on the grid. |
+    | 3. | Click **Export to Excel** to export the selected certificates in .xlsx file.<br />![image](https://user-images.githubusercontent.com/98990887/172182457-de4bfadc-b2c0-4534-9937-5a45adb42680.png) |
+    | 4. | Open the .xlsx file and save it as a CSV file |
+
 Sample output:
 
 ```
