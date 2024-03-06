@@ -62,7 +62,7 @@ The script will prompt for the following information:
 
 - Path to CAGW Client Credential P12
 - Password for the CAGW Client Credential P12
-- The URL for CAGW (https://cagw.pkiaas.entrust.com/cagw by default)
+- The URL for CAGW (such as https://cagw.pkiaas.entrust.com/cagw)
 
 Sample output:
 
@@ -70,12 +70,20 @@ Sample output:
 --------------------------
 Entrust CA Gateway Utility
 --------------------------
-Path to client credentials file (PKCS#12): entrust-cagw-rqblr8xekifien.p12
-Enter PKCS#12 file password:
-Enter CA Gateway URL (e.g. https://cagw.pkiaas.entrust.com/cagw):
+Path to client credentials file (PKCS#12): ./entrust-cagw-rqblr8xekifien.p12
+Enter PKCS#12 file password: Please select the CAGW type:
+  1. PKIaaS
+  2. On-Premises
+CAGW Type: 1
+Please select the PKIaaS Region:
+  1. US: https://cagw.pkiaas.entrust.com/cagw
+  2. EU: https://cagw.eu.pkiaas.entrust.com/cagw
+  3. PQ: https://cagw.pqlab.pkiaas.entrust.com/cagw
+CAGW REGION: 1
 --------------------------
-CAGW P12: entrust-cagw-rqblr8xekifien.p12
+CAGW P12: ./entrust-cagw-rqblr8xekifien.p12
 CAGW URL: https://cagw.pkiaas.entrust.com/cagw
+
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)

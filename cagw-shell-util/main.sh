@@ -23,9 +23,35 @@ get_client_credentials() {
     RESULT=$?
   done
   
-	printf '\n%s' "Enter CA Gateway URL (e.g. https://cagw.pkiaas.entrust.com/cagw): "
-	read -r CAGW_URL
-  [[ -z "${CAGW_URL// }" ]] && export CAGW_URL="https://cagw.pkiaas.entrust.com/cagw"
+
+  CAGW_TYPE=0
+  printf '%s\n' "Please select the CAGW type:"
+  printf '%s\n' "  1. PKIaaS"
+  printf '%s\n' "  2. On-Premises"
+  while [[ ${CAGW_TYPE} -lt 1 || ${CAGW_TYPE} -gt 2 ]]; do
+    read -rp "CAGW Type: " CAGW_TYPE
+    [[ ${CAGW_TYPE} -lt 1 || ${CAGW_TYPE} -gt 2 ]] && echo "bad selection ${CAGW_TYPE}"
+  done
+
+  CAGW_REGION=0
+  if [[ "${CAGW_TYPE}" -eq 1 ]]; then
+    printf '%s\n' "Please select the PKIaaS Region:"
+    printf '%s\n' "  1. US: https://cagw.pkiaas.entrust.com/cagw"
+    printf '%s\n' "  2. EU: https://cagw.eu.pkiaas.entrust.com/cagw"
+    printf '%s\n' "  3. PQ: https://cagw.pqlab.pkiaas.entrust.com/cagw"
+    while [[ ${CAGW_REGION} -lt 1 || ${CAGW_REGION} -gt 3 ]]; do
+      read -rp "CAGW REGION: " CAGW_REGION
+      [[ ${CAGW_REGION} -lt 1 || ${CAGW_REGION} -gt 3 ]] && echo "bad selection ${CAGW_REGION}"
+    done
+    [[ ${CAGW_REGION} -eq 1 ]] && export CAGW_URL="https://cagw.pkiaas.entrust.com/cagw"
+    [[ ${CAGW_REGION} -eq 2 ]] && export CAGW_URL="https://cagw.eu.pkiaas.entrust.com/cagw"
+    [[ ${CAGW_REGION} -eq 3 ]] && export CAGW_URL="https://cagw.pqlab.pkiaas.entrust.com/cagw"
+  elif [[ "${CAGW_TYPE}" -eq 2 ]]; then
+	  read -rp "Enter CA Gateway URL (e.g. https://cagw-server.com/cagw): " CAGW_URL
+    while [[ -z "${CAGW_URL// }" ]]; do
+	    read -rp "Enter CA Gateway URL (e.g. https://cagw-server.com/cagw): " CAGW_URL
+    done
+  fi
 }
 
 get_caid_list () {
