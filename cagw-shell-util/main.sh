@@ -1,9 +1,11 @@
 #!/bin/bash
 
+# NOTE: Any modifications to this file are made at your own risk. Support will not be provided for a modified script.
 
 # Requirements:
 #  - Bash version 4.4+
 #  - jq
+#  - curl v7.81+
 
 get_client_credentials() {
   P12=""
@@ -174,7 +176,9 @@ sanitize_cert_events () {
       FILECOUNT=$(( FILECOUNT + 1 ))
       JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
     done
-    [[ $(( (i+1) % (REVOKED_SN_COUNT / 10) )) -eq 0 ]] && printf '%s\n' "Removed $(( (i+1) * 2 )) of $(( REVOKED_SN_COUNT * 2 )) revoked certificate events."
+    [[ $(( REVOKED_SN_COUNT / 10 )) -ne 0 ]] && 
+      [[ $(( (i+1) % (REVOKED_SN_COUNT / 10) )) -eq 0 ]] && 
+      printf '%s\n' "Removed $(( (i+1) * 2 )) of $(( REVOKED_SN_COUNT * 2 )) revoked certificate events."
   done
   
   #Calculate number certificate events remaining after removing revoked certificates
@@ -550,11 +554,11 @@ main() {
       fi
       snToRevoke=$(printf '%s' "$sn" | tr -d '\r')
 
-    done <$REVOKE_CSV
+    done <"$REVOKE_CSV"
 
     echo "REVOKE SN : $snToRevoke"
     curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\",\"issueCrl\":\"true\"}}" \
-      --cert-type P12 --cert "$P12":"$P12_PWD" $CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions
+      --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions"
     res=$?
     if test "$res" != "0"; then
       echo "ERROR!!!: $res"
