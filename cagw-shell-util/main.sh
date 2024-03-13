@@ -7,6 +7,9 @@
 #  - jq
 #  - curl v7.81+
 
+STDOUT=$(mktemp)
+STDERR=$(mktemp)
+
 get_client_credentials() {
   P12=""
   # Continuously ask for P12 filepath until a valid filepath has been provided
@@ -21,8 +24,14 @@ get_client_credentials() {
   while [[ ${RESULT} -ne 0 ]]; do
     printf '%s' "Enter PKCS#12 file password: "
     read -sr P12_PWD
-    openssl pkcs12 -legacy -in "${P12}" -password pass:"${P12_PWD}" -nokeys > /dev/null
-    RESULT=$?
+    OPENSSL_VERSION=$(openssl version | awk '$2 ~ /(^3\.)/ { exit 1 }' && echo "OLD")
+    if [[ "${OPENSSL_VERSION}" == "OLD" ]]; then
+      openssl pkcs12 -in "${P12}" -password pass:"${P12_PWD}" -nokeys 2>"${STDERR}" 1>"${STDOUT}"
+      RESULT=$?
+    else
+      openssl pkcs12 -legacy -in "${P12}" -password pass:"${P12_PWD}" -nokeys 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    fi
+    [[ "${RESULT}" -ne 0 ]] && cat "${STDERR}"
   done
   
 
