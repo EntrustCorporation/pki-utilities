@@ -32,9 +32,16 @@ CLEANUP=1
 #   - Default value should be adequate in most cases.
 #   - Default value: 2000-01-01T00:00:00.00Z
 REPORT_START_DATE="2000-01-01T00:00:00.00Z"
+# INSECURE_TLS
+#   - Enable this setting to curl with untrusted TLS Connections
+#   - Default Value: 0
+#   - To enabled the setting, use a value of: 1
+INSECURE_TLS=0
 
 # START: CONSTANTS - Do not modify
 DIVIDER="--------------------------"
+CURL_COMMAND="curl"
+[[ "${INSECURE_TLS}" -eq 1 ]] && CURL_COMMAND="curl -k"
 REQ_CURL_VER="7.81"
 REQ_OPENSSL_VER="3.0.0"
 PKIAAS=1
@@ -323,9 +330,9 @@ function parallel_exec {
 
 get_caid_list () {
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-    curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities?%24fields=caList.certificate.certificateData" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}"  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities?%24fields=caList.certificate.certificateData" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities?%24fields=caList.certificate.certificateData" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}"  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities?%24fields=caList.certificate.certificateData" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
   CA_LIST=$(cat "${STDOUT}")
@@ -369,9 +376,9 @@ prompt_for_caid () {
 
 get_profiles_list() {
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-    curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities/${CAID}/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}"  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities/${CAID}/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/${CAID}/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}"  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/${CAID}/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
   PROFILES_LIST=$(cat "${STDOUT}")
@@ -710,9 +717,9 @@ enroll_csr() {
 
   # Execute Curl Command
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-    curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"${CSR}\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"${CSR}\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"${CSR}\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert "$P12":"$P12_PWD" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"${CSR}\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert "$P12":"$P12_PWD" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
   RESPONSE=$(cat "${STDOUT}")
@@ -750,9 +757,9 @@ enroll_p12() {
 
   # Execute Curl Command
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-    curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PKCS12\",\"protection\":{\"type\":\"PasswordProtection\",\"password\":\"${PASSWORD}\"}},\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PKCS12\",\"protection\":{\"type\":\"PasswordProtection\",\"password\":\"${PASSWORD}\"}},\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PKCS12\",\"protection\":{\"type\":\"PasswordProtection\",\"password\":\"${PASSWORD}\"}},\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert "$P12":"$P12_PWD" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PKCS12\",\"protection\":{\"type\":\"PasswordProtection\",\"password\":\"${PASSWORD}\"}},\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert "$P12":"$P12_PWD" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
   RESPONSE=$(cat "${STDOUT}")
@@ -1000,9 +1007,9 @@ generate_csr() {
 list_cas() {
   printf '%s\n' "${DIVIDER}"
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-    curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}"  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}"  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
   printf '%s\n%s\n' "RESULT:" "$(cat "${STDOUT}")"
@@ -1012,9 +1019,9 @@ list_ca_profiles() {
   printf '%s\n' "${DIVIDER}"
   prompt_for_caid
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-    curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities/$CAID/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}"  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities/$CAID/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}"  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
   printf '%s\n%s\n' "RESULT:" "$(cat "${STDOUT}")"
@@ -1050,9 +1057,9 @@ revoke_sn() {
   read -rp "Enter a comment about the action (optional): " COMMENT
   get_action_reason
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-    curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
   printf '%s\n%s\n' "RESULT:" "$(cat "${STDOUT}")"
@@ -1085,9 +1092,9 @@ bulk_issue() {
       sed -i 1d "${TARGET_FOLDER}/${commonName}.csr" &> /dev/null
       sed -i '' -e '$ d' "${TARGET_FOLDER}/${commonName}.csr" &> /dev/null
       if [[ "${CURL_VERSION}" == "OLD" ]]; then
-        curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < "${TARGET_FOLDER}/${commonName}.csr")\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"CN=$commonName\"}}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities/$CAID/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+        "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < "${TARGET_FOLDER}/${commonName}.csr")\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"CN=$commonName\"}}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities/$CAID/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
       else
-         curl -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < "${TARGET_FOLDER}/${commonName}.csr")\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"CN=$commonName\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+         "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < "${TARGET_FOLDER}/${commonName}.csr")\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"CN=$commonName\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
       fi
       [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
       RESPONSE=$(cat "${STDOUT}")
@@ -1129,9 +1136,9 @@ bulk_revoke() {
     if test "$snToRevoke" != "0"; then
       echo "REVOKE SN : $snToRevoke"
       if [[ "${CURL_VERSION}" == "OLD" ]]; then
-        curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\"}}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+        "${CURL_COMMAND}" --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\"}}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
       else
-         curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+         "${CURL_COMMAND}" --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
       fi
       [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
     fi
@@ -1141,9 +1148,9 @@ bulk_revoke() {
 
   echo "REVOKE SN : $snToRevoke"
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-  curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\",\"issueCrl\":\"true\"}}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+  "${CURL_COMMAND}" --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\",\"issueCrl\":\"true\"}}" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\",\"issueCrl\":\"true\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\",\"issueCrl\":\"true\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
   IFS=$OLDIFS
@@ -1160,9 +1167,9 @@ generate_report() {
   # Run initial CURL command to fetch first page of certificates
   printf '\n%s\n' "[$(date -Iseconds)] Fetching list of certificate events..."
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-    curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
   CURL_OUTPUT=$(cat "${STDOUT}")
@@ -1181,9 +1188,9 @@ generate_report() {
   while [[ ${MORE_PAGES} == "true" ]]; do
     printf '\r%s' "Fetched ${TOTAL_CERT_EVENTS}. Fetching next batch of ${PAGE_SIZE} certificate events."
     if [[ "${CURL_VERSION}" == "OLD" ]]; then
-      curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}&nextPageIndex=$NEXT_PAGE_INDEX" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+      "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}&nextPageIndex=$NEXT_PAGE_INDEX" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
     else
-      curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}&nextPageIndex=$NEXT_PAGE_INDEX" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+      "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}&nextPageIndex=$NEXT_PAGE_INDEX" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
     fi
     [[ "${RESULT}" -ne 0 ]] && printf '\n%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
     CURL_OUTPUT=$(cat "${STDOUT}")
@@ -1211,9 +1218,9 @@ revoke_subject() {
   read -rp "Enter a comment about the action (optional): " COMMENT
   get_action_reason
   if [[ "${CURL_VERSION}" == "OLD" ]]; then
-    curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}" --cacert "${P12_CA}"  --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" "$CAGW_URL/v1/certificate-authorities/$CAID/subjects/$(printf '%s' "${SUBJECT_DN}" | jq -sRr @uri)/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type PEM --cert "${P12_CERT}" --key "${P12_KEY}"  --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" "$CAGW_URL/v1/certificate-authorities/$CAID/subjects/$(printf '%s' "${SUBJECT_DN}" | jq -sRr @uri)/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   else
-    curl -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD"  --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" "$CAGW_URL/v1/certificate-authorities/$CAID/subjects/$(printf '%s' "${SUBJECT_DN}" | jq -sRr @uri)/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
+    "${CURL_COMMAND}" -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD"  --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" "$CAGW_URL/v1/certificate-authorities/$CAID/subjects/$(printf '%s' "${SUBJECT_DN}" | jq -sRr @uri)/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
   [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
 }
