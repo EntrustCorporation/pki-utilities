@@ -36,7 +36,7 @@ REPORT_START_DATE="2000-01-01T00:00:00.00Z"
 #   - Enable this setting to curl with untrusted TLS Connections
 #   - Default Value: 0
 #   - To enabled the setting, use a value of: 1
-INSECURE_TLS=0
+INSECURE_TLS=1
 
 # START: CONSTANTS - Do not modify
 DIVIDER="--------------------------"
@@ -47,7 +47,7 @@ REQ_OPENSSL_VER="3.0.0"
 PKIAAS=1
 ONPREM=2
 DIR="$(cd "$(dirname "$0")" && pwd)"
-[[ ! -f "${PATH_FOR_TMP_WORKING_DIR}" ]] && mkdir -p "${PATH_FOR_TMP_WORKING_DIR}"
+mkdir -p "${PATH_FOR_TMP_WORKING_DIR}"
 TMP_WORKING_DIR="$(cd "${PATH_FOR_TMP_WORKING_DIR}" && pwd)"
 STDOUT="${TMP_WORKING_DIR}/stdout_$(date +%s)"
 STDERR="${TMP_WORKING_DIR}/stderr_$(date +%s)"
@@ -99,9 +99,7 @@ SANS=(
 
 exit_and_cleanup() {
   EXIT_STATUS="${1}"
-  rm -f "${SUBJECTS}"
-  rm -f "${REVOKED_SN_LIST}"
-  [[ "${CLEANUP}" -eq 1 ]] && rm -rf "${PATH_FOR_TMP_WORKING_DIR}"
+  [[ "${CLEANUP}" -eq 1 ]] && rm -rf "${TMP_WORKING_DIR}"
   printf '\n%s\n' "Exiting with exit status '${EXIT_STATUS}'"
   # Kill all child processes using pkill
   pkill -P $$
@@ -318,7 +316,7 @@ function parallel_exec {
   _command="$1"
   _pids="$2"
   _tmpFiles="$3"
-  tmpFile=$(mktemp)
+  tmpFile=$(mktemp -p "${TMP_WORKING_DIR}")
   echo "$_command" > "$tmpFile"
   #$_command &>>"$tmpFile" & 
   $_command >>"$tmpFile" 2>&1 &
@@ -334,7 +332,10 @@ get_caid_list () {
   else
     ${CURL_COMMAND}  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities?%24fields=caList.certificate.certificateData" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]]; then
+   printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+   exit_and_cleanup "${RESULT}"
+  fi
   CA_LIST=$(cat "${STDOUT}")
   CA_ID_LIST=()
   while read -r line; do CA_ID_LIST+=("$line"); done < <(echo "$CA_LIST" | jq -r '.caList[].id')
@@ -380,7 +381,10 @@ get_profiles_list() {
   else
     ${CURL_COMMAND}  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/${CAID}/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]]; then
+    printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+    exit_and_cleanup "${RESULT}"
+  fi
   PROFILES_LIST=$(cat "${STDOUT}")
   PROFILE_ID_LIST=()
   while read -r line; do PROFILE_ID_LIST+=("$line"); done < <(echo "$PROFILES_LIST" | jq -r '.profiles[].id')
@@ -441,21 +445,24 @@ extract_cert_details () {
     JSON=$(jq -r --argjson i ${i} --arg subject "${SUBJECT}" --arg expiry "${EXPIRY}" --arg status "${STATUS}" '.[$i] += { "Subject": $subject, "Expiry Date": $expiry, "Status": $status }' "${JSON_FILENAME}" --unbuffered)
     echo "${JSON}" > "${JSON_FILENAME}"
   done
-  jq -r '.[] | [."action", ."eventDate", ."Status", ."Subject", ."Expiry Date", ."serialNumber", ."certificate"] | @csv' "${JSON_FILENAME}" --unbuffered >> "${CSV_FILENAME}" && rm -f "${JSON_FILENAME}" && return 0
-  return 1
+  jq -r '.[] | [."action", ."eventDate", ."Status", ."Subject", ."Expiry Date", ."serialNumber", ."certificate"] | @csv' "${JSON_FILENAME}" --unbuffered >> "${CSV_FILENAME}"
+  JQ_RESULT="${?}"
+  return "${JQ_RESULT}"
 }
 
 sanitize_cert_events () {
   printf '\n%s\n' "[$(date -Iseconds)] Processing certificiate events..."
   FILENAME="${1}"
   FILECOUNT=1
+  TOTAL_FILECOUNT="${2}"
   JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
 
-  printf '%s\n' "[$(date -Iseconds)] Searching for revoked certificate events..."
-  REVOKED_SN_LIST=$(mktemp)
-  echo "Expired" > "${REVOKED_SN_LIST}"
+  printf '\n%s\n' "[$(date -Iseconds)] Searching for revoked certificate events..."
+  REVOKED_SN_LIST="${TMP_WORKING_DIR}/revoked_sn_list_$(date +%s)"
+  echo "/Expired" > "${REVOKED_SN_LIST}"
   while [[ -f "${JSON_FILENAME}" ]]; do
     jq -r --arg status "revoked" '.[] | select(.action == $status) | ."serialNumber"' "${JSON_FILENAME}" >> "${REVOKED_SN_LIST}"
+    progress_bar "${FILECOUNT}" "${TOTAL_FILECOUNT}"
     FILECOUNT=$(( FILECOUNT + 1 ))
     JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
   done
@@ -470,10 +477,10 @@ sanitize_cert_events () {
   #Done calculation of total events (needed to print out the final stats at the end)
 
   # Extract Subject and Expiry Date for each certificate
-  printf '\n%s\n' "[$(date -Iseconds)] Extracting certificate details..."
+  printf '\n\n%s\n' "[$(date -Iseconds)] Extracting certificate details..."
   # Extract data from files in batches
-  pids=()
-  tmpFiles=()
+  export pids=()
+  export tmpFiles=()
   concurrent=0
   FILECOUNT=1
   JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
@@ -486,9 +493,10 @@ sanitize_cert_events () {
       wait_pids pids tmpFiles
       progress_bar "${FILECOUNT}" "${TOTAL_FILECOUNT}"
       RETURN_STATUS="${?}"
-      [[ "${RETURN_STATUS}" -eq 1 ]] \
-        && echo "Error occurred attempting to sanitize SNs." \
-        && exit_and_cleanup 1
+      if [[ "${RETURN_STATUS}" -eq 1 ]]; then
+        echo "Error occurred attempting to sanitize SNs." \
+        exit_and_cleanup "${RETURN_STATUS}"
+      fi
       pids=()
       tmpFiles=()
       concurrent=0
@@ -508,7 +516,6 @@ sanitize_cert_events () {
   while true; do
     [[ ! -f "${CSV_FILENAME}" ]] && break
     cat "${CSV_FILENAME}" >> "${CSV}.tmp"
-    rm -f "${CSV_FILENAME}"
     progress_bar "${FILECOUNT}" "${TOTAL_FILECOUNT}"
     FILECOUNT=$(( FILECOUNT + 1 ))
     CSV_FILENAME="${FILENAME}.${FILECOUNT}.csv"
@@ -516,9 +523,14 @@ sanitize_cert_events () {
   printf '\n\n'
 
   printf '\n%s\n' "[$(date -Iseconds)] Removing all expired and revoked certificates..."
+  # Convert list of Revoked SNs into a "sed script" to get around the sed limitations
+  # regarding a very large list of arguments.
+  # Format of file needs to be: /111/d;222d;...999d
+  SED_SCRIPT="${TMP_WORKING_DIR}/SED_SCRIPT_$(date +%s)"
+  awk '{printf "%s/d;/", $0}' "${REVOKED_SN_LIST}" > "${SED_SCRIPT}"
+  truncate -s-1 "${SED_SCRIPT}"
   # Remove Expired and Revoked Certificates
-  sed -E '/\<('"$(tr '\n' '|' < "${REVOKED_SN_LIST}" )"')\>/d' "${CSV}.tmp" > "${CSV}"
-  rm -f "${CSV}.tmp"
+  sed -E -f "${SED_SCRIPT}" "${CSV}.tmp" > "${CSV}"
 
   EVENTS_REMAINING=$(wc -l < "${CSV}" | tr -d ' ')
   # Decrement by 1 to account for CSV Header
@@ -667,18 +679,24 @@ enroll_csr() {
     get_subject_altnames
   elif [[ "${REUSE_SAN}" == "Y" ]]; then
     # Create self-signed certificate temporarily. Needed to extract Extensions from CSR properly using OpenSSL
-    TEMP_KEY="${PATH_FOR_TMP_WORKING_DIR}/tmpkey__$(date +%s)"
-    TEMP_CERT="${PATH_FOR_TMP_WORKING_DIR}/tmpcrt__$(date +%s)"
+    TEMP_KEY="${TMP_WORKING_DIR}/tmpkey_$(date +%s)"
+    TEMP_CERT="${TMP_WORKING_DIR}/tmpcrt_$(date +%s)"
     openssl genrsa -out "${TEMP_KEY}" 3072  2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
-    [[ "${RESULT}" -ne 0 ]] && rm -f "${TEMP_CERT}" && rm -f "${TEMP_KEY}" && echo "Error generating temporary RSA Key" && printf '%s\n%s\n' "${STDOUT}" "${STDERR}" && main
+    if [[ "${RESULT}" -ne 0 ]]; then
+      echo "Error generating temporary RSA Key"
+      printf '%s\n%s\n' "${STDOUT}" "${STDERR}"
+      exit_and_cleanup "${RESULT}"
+    fi
     openssl x509 -in "${CSR_INPUT_PATH}" -out "${TEMP_CERT}"  -req -signkey "${TEMP_KEY}" -days 1 -copy_extensions copy 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
-    [[ "${RESULT}" -ne 0 ]] && rm -f "${TEMP_CERT}" && rm -f "${TEMP_KEY}" && echo "Error generating temporary Self-Signed Cert" && printf '%s\n%s\n' "${STDOUT}" "${STDERR}" && main
+    if [[ "${RESULT}" -ne 0 ]]; then
+      echo "Error generating temporary Self-Signed Cert"
+      printf '%s\n%s\n' "${STDOUT}" "${STDERR}"
+      exit_and_cleanup "${RESULT}"
+    fi
     # Extract SANs from self-signed cert
     IFS_ORIG="${IFS}"
     IFS=', ' read -r -a SANS <<< "$(openssl x509 -noout -ext subjectAltName -in "${TEMP_CERT}" | sed 1d)"
     IFS="${IFS_ORIG}"
-    rm -f "${TEMP_CERT}"
-    rm -f "${TEMP_KEY}"
     EMAIL=()
     DNS=()
     URI=()
@@ -721,10 +739,16 @@ enroll_csr() {
   else
     ${CURL_COMMAND} -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"${CSR}\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert "$P12":"$P12_PWD" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]]; then
+    printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+    exit_and_cleanup "${RESULT}"
+  fi
   RESPONSE=$(cat "${STDOUT}")
   RESPONSE_TYPE=$(printf '%s' "${RESPONSE}" | jq -r '.type')
-  [[ "${RESPONSE_TYPE}" == "ErrorResponse" ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESPONSE_TYPE}" == "ErrorResponse" ]]; then
+    printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+    exit_and_cleanup 1
+  fi
   printf '%s\n%s\n' "Response:" "${RESPONSE}"
   # Prompt for Certificate File Path
   CERT_PATH=""
@@ -761,7 +785,10 @@ enroll_p12() {
   else
     ${CURL_COMMAND} -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PKCS12\",\"protection\":{\"type\":\"PasswordProtection\",\"password\":\"${PASSWORD}\"}},\"optionalCertificateRequestDetails\":{\"subjectDn\":\"$CERT_OPT_PARAMS_SUBJECT_DN\"},\"subjectAltNames\":$SAN_ARRAY}" --cert-type P12 --cert "$P12":"$P12_PWD" "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]]; then
+     printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+     exit_and_cleanup "${RESULT}"
+  fi
   RESPONSE=$(cat "${STDOUT}")
   RESPONSE_TYPE=$(printf '%s' "${RESPONSE}" | jq -r '.type')
   [[ "${RESPONSE_TYPE}" == "ErrorResponse" ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
@@ -825,7 +852,6 @@ generate_csr() {
     [[ "${FULL_DN}" == "" ]] && FULL_DN=$(printf '%s%s' "${DN_OPTIONS[$(( DN_ATT-1 ))]}=" "${DN_VAL}")
   done
   tac "${SUBJECTS}" >> "${CSR_CONFIG}"
-  rm -f "${SUBJECTS}"
 
   printf '%s\n' "Select the Key Alorithm:"
   printf '%s\n' "  1. RSA"
@@ -997,7 +1023,6 @@ generate_csr() {
   cat "${CSR_CONFIG}"
 
   openssl req -new -key "${KEY_PATH}" -out "${CSR_PATH}" -config "${CSR_CONFIG}" -nodes
-  rm -f "${CSR_CONFIG}"
   echo "CSR:"
   cat "${CSR_PATH}"
   printf '%s\n' "Private Key: $(readlink -f "${KEY_PATH}")"
@@ -1011,7 +1036,10 @@ list_cas() {
   else
     ${CURL_COMMAND}  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]]; then
+    printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+    exit_and_cleanup "${RESULT}"
+  fi
   printf '%s\n%s\n' "RESULT:" "$(cat "${STDOUT}")"
 }
 
@@ -1023,7 +1051,10 @@ list_ca_profiles() {
   else
     ${CURL_COMMAND}  --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/profiles" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]]; then
+   printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+   exit_and_cleanup "${RESULT}"
+  fi
   printf '%s\n%s\n' "RESULT:" "$(cat "${STDOUT}")"
 }
 
@@ -1061,7 +1092,10 @@ revoke_sn() {
   else
     ${CURL_COMMAND} --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$CERTIFICATE_SERIAL/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]]; then
+    printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+    exit_and_cleanup "${RESULT}"
+  fi
   printf '%s\n%s\n' "RESULT:" "$(cat "${STDOUT}")"
 }
 
@@ -1096,7 +1130,10 @@ bulk_issue() {
       else
          ${CURL_COMMAND} -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < "${TARGET_FOLDER}/${commonName}.csr")\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"CN=$commonName\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
       fi
-      [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+      if [[ "${RESULT}" -ne 0 ]]; then 
+        printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+        exit_and_cleanup "${RESULT}"
+      fi
       RESPONSE=$(cat "${STDOUT}")
       CERT_PATH=""
       while [[ "${CERT_PATH}" == "" ]]; do
@@ -1140,7 +1177,10 @@ bulk_revoke() {
       else
          ${CURL_COMMAND} --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
       fi
-      [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+      if [[ "${RESULT}" -ne 0 ]]; then
+        printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+        exit_and_cleanup "${RESULT}"
+      fi
     fi
     snToRevoke=$(printf '%s' "$sn" | tr -d '\r')
 
@@ -1152,7 +1192,10 @@ bulk_revoke() {
   else
     ${CURL_COMMAND} --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\",\"issueCrl\":\"true\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]]; then
+    printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+    exit_and_cleanup "${RESULT}"
+  fi
   IFS=$OLDIFS
 }
 
@@ -1171,7 +1214,10 @@ generate_report() {
   else
     ${CURL_COMMAND} -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]];then
+    printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+    exit_and_cleanup "${RESULT}"
+  fi
   CURL_OUTPUT=$(cat "${STDOUT}")
   # Stop if CURL_OUTPUT doesn't contain expected JSON Data
   VALID_JSON=$(echo "$CURL_OUTPUT" | jq -r '.type' 2>/dev/null)
@@ -1192,7 +1238,10 @@ generate_report() {
     else
       ${CURL_COMMAND} -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificate-events?preferredPageSize=${PAGE_SIZE}&startDate=${REPORT_START_DATE}&nextPageIndex=$NEXT_PAGE_INDEX" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
     fi
-    [[ "${RESULT}" -ne 0 ]] && printf '\n%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+    if [[ "${RESULT}" -ne 0 ]]; then
+      printf '\n%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+      exit_and_cleanup "${RESULT}"
+    fi
     CURL_OUTPUT=$(cat "${STDOUT}")
     NEXT_PAGE_INDEX=$(echo "${CURL_OUTPUT}" | jq -r '.nextPageIndex')
     MORE_PAGES=$(echo "${CURL_OUTPUT}" | jq -r '.morePages')
@@ -1202,7 +1251,7 @@ generate_report() {
     echo "${CURL_OUTPUT}" | jq -r '.events' > "${JSON_FILENAME}"
     unset CURL_OUTPUT
   done
-  sanitize_cert_events "${FILENAME}"
+  sanitize_cert_events "${FILENAME}" "${FILECOUNT}"
   printf '\n'
 }
 
@@ -1222,7 +1271,10 @@ revoke_subject() {
   else
     ${CURL_COMMAND} -s --header "Accept: application/json" -H "Content-Type: application/json" --cert-type P12 --cert "$P12":"$P12_PWD"  --data "{\"action\":{\"comment\":\"$COMMENT\",\"type\":\"$ACTION_TYPE\",\"reason\":\"$ACTION_REASON\"}}" "$CAGW_URL/v1/certificate-authorities/$CAID/subjects/$(printf '%s' "${SUBJECT_DN}" | jq -sRr @uri)/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   fi
-  [[ "${RESULT}" -ne 0 ]] && printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")" && main
+  if [[ "${RESULT}" -ne 0 ]];then
+    printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
+    exit_and_cleanup "${RESULT}"
+  fi
 }
 
 
