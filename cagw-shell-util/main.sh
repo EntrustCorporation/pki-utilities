@@ -36,7 +36,7 @@ REPORT_START_DATE="2000-01-01T00:00:00.00Z"
 #   - Enable this setting to curl with untrusted TLS Connections
 #   - Default Value: 0
 #   - To enabled the setting, use a value of: 1
-INSECURE_TLS=1
+INSECURE_TLS=0
 
 # START: CONSTANTS - Do not modify
 DIVIDER="--------------------------"
