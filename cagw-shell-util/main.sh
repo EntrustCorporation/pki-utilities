@@ -531,6 +531,7 @@ sanitize_cert_events () {
   truncate -s-1 "${SED_SCRIPT}"
   # Remove Expired and Revoked Certificates
   sed -E -f "${SED_SCRIPT}" "${CSV}.tmp" > "${CSV}"
+  mv "${CSV}.tmp" "${TMP_WORKING_DIR}"
 
   EVENTS_REMAINING=$(wc -l < "${CSV}" | tr -d ' ')
   # Decrement by 1 to account for CSV Header
