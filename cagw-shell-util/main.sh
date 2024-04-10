@@ -54,6 +54,8 @@ STDERR="${TMP_WORKING_DIR}/stderr_$(date +%s)"
 P12_CERT="${TMP_WORKING_DIR}/p12cert_$(date +%s)"
 P12_KEY="${TMP_WORKING_DIR}/p12key_$(date +%s)"
 P12_CA="${TMP_WORKING_DIR}/p12ca_$(date +%s)"
+EXT_CSV=".csv"
+EXT_JSON=".json"
 DN_OPTIONS=(
   "CN"
   "SN"
@@ -428,8 +430,8 @@ progress_bar() {
 }
 
 extract_cert_details () {
-  JSON_FILENAME="${1}.json"
-  CSV_FILENAME="${1}.csv"
+  JSON_FILENAME="${1}${EXT_JSON}"
+  CSV_FILENAME="${1}${EXT_CSV}"
   EVENTCOUNT_IN_FILE=$(jq -r '. | length' "${JSON_FILENAME}" --unbuffered)
   # Process all events in a single file.
   for (( i=0 ; i < EVENTCOUNT_IN_FILE ; i++ )); do
@@ -450,27 +452,44 @@ extract_cert_details () {
   return "${JQ_RESULT}"
 }
 
+remove_revoked_and_expired_events() {
+  CSV_FILENAME="${1}${EXT_CSV}"
+  REVOKED_SN_FILES="${2}"
+  SN_FILECOUNT=1
+  while true; do
+    [[ ! -f "${REVOKED_SN_FILES}.${SN_FILECOUNT}" ]] && break
+    sed -i -E '/\<('"$(tr '\n' '|' < "${REVOKED_SN_FILES}.${SN_FILECOUNT}" )"')\>/d' "${CSV_FILENAME}"; RESULT="${?}"
+    [[ "${RESULT}" -ne 0 ]] && echo "Failed to process ${CSV_FILENAME} using ${REVOKED_SN_FILES}.${SN_FILECOUNT}" && return "${RESULT}"
+    SN_FILECOUNT=$(( SN_FILECOUNT + 1 ))
+  done
+
+}
+
 sanitize_cert_events () {
   printf '\n%s\n' "[$(date -Iseconds)] Processing certificiate events..."
   FILENAME="${1}"
   FILECOUNT=1
   TOTAL_FILECOUNT="${2}"
-  JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
+  JSON_FILENAME="${FILENAME}.${FILECOUNT}${EXT_JSON}"
 
   printf '\n%s\n' "[$(date -Iseconds)] Searching for revoked certificate events..."
-  REVOKED_SN_LIST="${TMP_WORKING_DIR}/revoked_sn_list_$(date +%s)"
-  echo "/Expired" > "${REVOKED_SN_LIST}"
+  REVOKED_SN_FILES="${TMP_WORKING_DIR}/revoked_sn_list_$(date +%s)"
+  REVOKED_SN_FILECOUNT=1
+  echo "Expired" > "${REVOKED_SN_FILES}.${REVOKED_SN_FILECOUNT}"
   while [[ -f "${JSON_FILENAME}" ]]; do
-    jq -r --arg status "revoked" '.[] | select(.action == $status) | ."serialNumber"' "${JSON_FILENAME}" >> "${REVOKED_SN_LIST}"
+    jq -r --arg status "revoked" '.[] | select(.action == $status) | ."serialNumber"' "${JSON_FILENAME}" >> "${REVOKED_SN_FILES}.${REVOKED_SN_FILECOUNT}"
     progress_bar "${FILECOUNT}" "${TOTAL_FILECOUNT}"
     FILECOUNT=$(( FILECOUNT + 1 ))
-    JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
+    JSON_FILENAME="${FILENAME}.${FILECOUNT}${EXT_JSON}"
+    if [[ $(wc -l < "${REVOKED_SN_FILES}.${REVOKED_SN_FILECOUNT}" | tr -d ' ') -ge 5000 ]]; then
+      REVOKED_SN_FILECOUNT=$(( REVOKED_SN_FILECOUNT + 1))
+    fi
   done
 
   #Calculate total number of cert events:
   FILECOUNT=$(( FILECOUNT - 1 ))
   TOTAL_FILECOUNT="${FILECOUNT}"
-  LAST_FILE="${FILENAME}.${FILECOUNT}.json"
+  LAST_FILE="${FILENAME}.${FILECOUNT}${EXT_JSON}"
   FILECOUNT=$(( FILECOUNT - 1 ))
   EVENT_COUNT_IN_LAST_FILE=$(jq -r '. | length' "${LAST_FILE}")
   TOTAL_EVENT_COUNT=$(( (FILECOUNT * PAGE_SIZE) + EVENT_COUNT_IN_LAST_FILE ))
@@ -483,7 +502,7 @@ sanitize_cert_events () {
   export tmpFiles=()
   concurrent=0
   FILECOUNT=1
-  JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
+  JSON_FILENAME="${FILENAME}.${FILECOUNT}${EXT_JSON}"
   MAX_THREADS="${MAX_THREADS_DEFAULT}"
   [[ "${TOTAL_FILECOUNT}" -lt "${MAX_THREADS_DEFAULT}" ]] && MAX_THREADS="${TOTAL_FILECOUNT}"
   while [[ -f "${JSON_FILENAME}" ]]; do
@@ -491,9 +510,41 @@ sanitize_cert_events () {
     concurrent=$(( concurrent + 1 ))
     if [[ "$concurrent" -eq $MAX_THREADS ]]; then
       wait_pids pids tmpFiles
-      progress_bar "${FILECOUNT}" "${TOTAL_FILECOUNT}"
       RETURN_STATUS="${?}"
-      if [[ "${RETURN_STATUS}" -eq 1 ]]; then
+      progress_bar "${FILECOUNT}" "${TOTAL_FILECOUNT}"
+      if [[ "${RETURN_STATUS}" -ne 0 ]]; then
+        echo "Error occurred attempting to extract certificate details." \
+        exit_and_cleanup "${RETURN_STATUS}"
+      fi
+      pids=()
+      tmpFiles=()
+      concurrent=0
+      [[ "$(( TOTAL_FILECOUNT - FILECOUNT ))" -lt "${MAX_THREADS_DEFAULT}" ]] && MAX_THREADS="$(( TOTAL_FILECOUNT - FILECOUNT ))"
+    fi
+    FILECOUNT=$(( FILECOUNT + 1 ))
+    JSON_FILENAME="${FILENAME}.${FILECOUNT}${EXT_JSON}"
+  done
+  progress_bar "$(( FILECOUNT - 1 ))" "${TOTAL_FILECOUNT}"
+  printf '\n'
+
+  printf '\n%s\n' "[$(date -Iseconds)] Removing all expired and revoked certificates..."
+  # Remove expired certs and revoked certs in batches.
+  export pids=()
+  export tmpFiles=()
+  concurrent=0
+  FILECOUNT=1
+  CSV_FILENAME="${FILENAME}.${FILECOUNT}"
+  # The next operation is CPU-intesive. Decrease max threads to prevent overloading the CPU.
+  MAX_THREADS="${MAX_THREADS_DEFAULT}"
+  [[ "${TOTAL_FILECOUNT}" -lt "${MAX_THREADS_DEFAULT}" ]] && MAX_THREADS="${TOTAL_FILECOUNT}"
+  while [[ -f "${CSV_FILENAME}${EXT_CSV}" ]]; do
+    parallel_exec "remove_revoked_and_expired_events ${CSV_FILENAME} ${REVOKED_SN_FILES}" pid tmpFiles
+    concurrent=$(( concurrent + 1 ))
+    if [[ "$concurrent" -eq $MAX_THREADS ]]; then
+      wait_pids pids tmpFiles
+      RETURN_STATUS="${?}"
+      progress_bar "${FILECOUNT}" "${TOTAL_FILECOUNT}"
+      if [[ "${RETURN_STATUS}" -ne 0 ]]; then
         echo "Error occurred attempting to sanitize SNs." \
         exit_and_cleanup "${RETURN_STATUS}"
       fi
@@ -503,35 +554,22 @@ sanitize_cert_events () {
       [[ "$(( TOTAL_FILECOUNT - FILECOUNT ))" -lt "${MAX_THREADS_DEFAULT}" ]] && MAX_THREADS="$(( TOTAL_FILECOUNT - FILECOUNT ))"
     fi
     FILECOUNT=$(( FILECOUNT + 1 ))
-    JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
+    CSV_FILENAME="${FILENAME}.${FILECOUNT}"
   done
   progress_bar "$(( FILECOUNT - 1 ))" "${TOTAL_FILECOUNT}"
   printf '\n'
 
   # Combine all of the CSV files into a single CSV File.
   printf '\n%s\n' "[$(date -Iseconds)] Combining all events into a single CSV File..."
-  printf '%s\n' '"Action","Issued Date","Status","Subject","Expiry Date","Serial Number","Certificate"' > "${CSV}.tmp"
+  printf '%s\n' '"Action","Issued Date","Status","Subject","Expiry Date","Serial Number","Certificate"' > "${CSV}"
   FILECOUNT=1
-  CSV_FILENAME="${FILENAME}.${FILECOUNT}.csv"
   while true; do
-    [[ ! -f "${CSV_FILENAME}" ]] && break
-    cat "${CSV_FILENAME}" >> "${CSV}.tmp"
+    [[ ! -f "${FILENAME}.${FILECOUNT}${EXT_CSV}" ]] && break
+    cat "${FILENAME}.${FILECOUNT}${EXT_CSV}" >> "${CSV}"
     progress_bar "${FILECOUNT}" "${TOTAL_FILECOUNT}"
     FILECOUNT=$(( FILECOUNT + 1 ))
-    CSV_FILENAME="${FILENAME}.${FILECOUNT}.csv"
   done
   printf '\n\n'
-
-  printf '\n%s\n' "[$(date -Iseconds)] Removing all expired and revoked certificates..."
-  # Convert list of Revoked SNs into a "sed script" to get around the sed limitations
-  # regarding a very large list of arguments.
-  # Format of file needs to be: /111/d;222d;...999d
-  SED_SCRIPT="${TMP_WORKING_DIR}/SED_SCRIPT_$(date +%s)"
-  awk '{printf "%s/d;/", $0}' "${REVOKED_SN_LIST}" > "${SED_SCRIPT}"
-  truncate -s-1 "${SED_SCRIPT}"
-  # Remove Expired and Revoked Certificates
-  sed -E -f "${SED_SCRIPT}" "${CSV}.tmp" > "${CSV}"
-  mv "${CSV}.tmp" "${TMP_WORKING_DIR}"
 
   EVENTS_REMAINING=$(wc -l < "${CSV}" | tr -d ' ')
   # Decrement by 1 to account for CSV Header
@@ -1205,7 +1243,7 @@ generate_report() {
   prompt_for_caid
   # Create CSV File with headers
   FILENAME="certificates_report_${CAID}_$(date +%s)"
-  CSV="${DIR}/${FILENAME}.csv"
+  CSV="${DIR}/${FILENAME}${EXT_CSV}"
   export CSV
   FILENAME="${TMP_WORKING_DIR}/${FILENAME}"
   # Run initial CURL command to fetch first page of certificates
@@ -1228,7 +1266,7 @@ generate_report() {
   TOTAL_CERT_EVENTS=$(echo "${CURL_OUTPUT}" | jq -r '.events | length')
 
   FILECOUNT=1
-  JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
+  JSON_FILENAME="${FILENAME}.${FILECOUNT}${EXT_JSON}"
   echo "${CURL_OUTPUT}" | jq '.events' > "${JSON_FILENAME}"
 
   [[ "${CAGW_TYPE}" -eq "${PKIAAS}" ]] && echo "CAGW API requests to fetch certificate events are limited to 50 events per page when using PKIaaS."
@@ -1248,7 +1286,7 @@ generate_report() {
     MORE_PAGES=$(echo "${CURL_OUTPUT}" | jq -r '.morePages')
     TOTAL_CERT_EVENTS=$(( TOTAL_CERT_EVENTS + $(echo "${CURL_OUTPUT}" | jq -r '.events | length') ))
     FILECOUNT=$(( FILECOUNT + 1 ))
-    JSON_FILENAME="${FILENAME}.${FILECOUNT}.json"
+    JSON_FILENAME="${FILENAME}.${FILECOUNT}${EXT_JSON}"
     echo "${CURL_OUTPUT}" | jq -r '.events' > "${JSON_FILENAME}"
     unset CURL_OUTPUT
   done
