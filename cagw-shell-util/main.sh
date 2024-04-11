@@ -13,12 +13,19 @@
 #  - pkill
 #  - awk
 #  - openssl
+#  - date
+#  - sed (must support -i and -E)
 
 # Options:
 # MAX_THREADS_DEFAULT
 #   - Defines the maximum number of concurrent subprocesses that can be spawned by the script.
 #   - Recommended to set this value to the number of CPU Cores
 MAX_THREADS_DEFAULT=10
+# MAX_REVOKED_SNS_PER_THREAD
+#   - Defines the maximum number of revoked serial numbers to process by a single thread at a time.
+#   - Processing takes places in memory.
+#   - Setting this value too high will consume all memory
+MAX_REVOKED_SNS_PER_THREAD=1000
 # PATH_FOR_TMP_WORKING_DIR:
 #   - Path to folder to use for temporary files.
 #   - This folder will be created if it doesn't exist
@@ -49,11 +56,6 @@ ONPREM=2
 DIR="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "${PATH_FOR_TMP_WORKING_DIR}"
 TMP_WORKING_DIR="$(cd "${PATH_FOR_TMP_WORKING_DIR}" && pwd)"
-STDOUT="${TMP_WORKING_DIR}/stdout_$(date +%s)"
-STDERR="${TMP_WORKING_DIR}/stderr_$(date +%s)"
-P12_CERT="${TMP_WORKING_DIR}/p12cert_$(date +%s)"
-P12_KEY="${TMP_WORKING_DIR}/p12key_$(date +%s)"
-P12_CA="${TMP_WORKING_DIR}/p12ca_$(date +%s)"
 EXT_CSV=".csv"
 EXT_JSON=".json"
 DN_OPTIONS=(
@@ -107,6 +109,16 @@ exit_and_cleanup() {
   pkill -P $$
   exit "${EXIT_STATUS}"
 }
+
+regen_dateBased_filenames() {
+  DATE=$(date +%s); export DATE
+  export STDOUT="${TMP_WORKING_DIR}/stdout_${DATE}"
+  export STDERR="${TMP_WORKING_DIR}/stderr_${DATE}"
+  export P12_CERT="${TMP_WORKING_DIR}/p12cert_${DATE}"
+  export P12_KEY="${TMP_WORKING_DIR}/p12key_${DATE}"
+  export P12_CA="${TMP_WORKING_DIR}/p12ca_${DATE}"
+}
+regen_dateBased_filenames
 
 # trap ctrl-c and call ctrl_c() to gracefully exit and cleanup.
 trap ctrl_c INT
@@ -181,7 +193,7 @@ prep_p12_for_curl() {
 init() {
   print_deps
   printf '%s\n%s\n%s\n' "${DIVIDER}" "Entrust CA Gateway Utility" "${DIVIDER}"
-  P12=""
+  export P12=""
   # Continuously ask for P12 filepath until a valid filepath has been provided
   while [[ ! -f "${P12}" ]]; do
     read -e -rp "Path to client credentials file (PKCS#12): " P12
@@ -266,16 +278,16 @@ function wait_pids {
 
       # Check if PID is running
       set +e
-      kill -s 0 $pid 2> /dev/null
+      kill -s 0 "${pid}" 2> /dev/null
       exitCode=$?
       set -e
       if [[ $exitCode -ne 0 ]]; then
-        visitedPids+=( $pid )
+        visitedPids+=( "${pid}" )
         
         set +e
-        wait $pid
+        wait "${pid}"
         pidExitCode=$?
-        exitCodes[$pid]=$pidExitCode
+        exitCodes[pid]=$pidExitCode
         set -e
 
         file=${_tmpFiles[$pid]}
@@ -285,9 +297,9 @@ function wait_pids {
 
         if [[ $pidExitCode -ne 0 ]]; then
           echo "ERROR:$pidExitCode"
-          cat $file
+          cat "${file}"
         fi
-        rm $file
+        rm "${file}"
       fi
       set -e
     done
@@ -295,11 +307,11 @@ function wait_pids {
   done
 
   # Exit if some child failed
-  for pid in ${!exitCodes[@]}; do
+  for pid in "${!exitCodes[@]}"; do
     exit_code=${exitCodes[$pid]} 
     if [[ $exit_code -ne 0 ]]; then
       echo "ERROR exit pid:$pid"
-      exit $exit_code
+      exit "${exit_code}"
     fi
   done
 
@@ -325,7 +337,7 @@ function parallel_exec {
   pid=$!
   #echo "PID: $pid running command \"$_command\""
   eval "$_pids+=($pid)"
-  eval "$_tmpFiles[$pid]=$tmpFile"
+  eval "$_tmpFiles[pid]=$tmpFile"
 }
 
 get_caid_list () {
@@ -473,7 +485,7 @@ sanitize_cert_events () {
   JSON_FILENAME="${FILENAME}.${FILECOUNT}${EXT_JSON}"
 
   printf '\n%s\n' "[$(date -Iseconds)] Searching for revoked certificate events..."
-  REVOKED_SN_FILES="${TMP_WORKING_DIR}/revoked_sn_list_$(date +%s)"
+  REVOKED_SN_FILES="${TMP_WORKING_DIR}/revoked_sn_list_${DATE}"
   REVOKED_SN_FILECOUNT=1
   echo "Expired" > "${REVOKED_SN_FILES}.${REVOKED_SN_FILECOUNT}"
   while [[ -f "${JSON_FILENAME}" ]]; do
@@ -481,7 +493,7 @@ sanitize_cert_events () {
     progress_bar "${FILECOUNT}" "${TOTAL_FILECOUNT}"
     FILECOUNT=$(( FILECOUNT + 1 ))
     JSON_FILENAME="${FILENAME}.${FILECOUNT}${EXT_JSON}"
-    if [[ $(wc -l < "${REVOKED_SN_FILES}.${REVOKED_SN_FILECOUNT}" | tr -d ' ') -ge 5000 ]]; then
+    if [[ $(wc -l < "${REVOKED_SN_FILES}.${REVOKED_SN_FILECOUNT}" | tr -d ' ') -ge "${MAX_REVOKED_SNS_PER_THREAD}" ]]; then
       REVOKED_SN_FILECOUNT=$(( REVOKED_SN_FILECOUNT + 1))
     fi
   done
@@ -1242,7 +1254,8 @@ generate_report() {
   printf '%s\n' "${DIVIDER}"
   prompt_for_caid
   # Create CSV File with headers
-  FILENAME="certificates_report_${CAID}_$(date +%s)"
+  regen_dateBased_filenames
+  FILENAME="certificates_report_${CAID}_${DATE}"
   CSV="${DIR}/${FILENAME}${EXT_CSV}"
   export CSV
   FILENAME="${TMP_WORKING_DIR}/${FILENAME}"
