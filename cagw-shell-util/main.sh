@@ -337,7 +337,7 @@ function parallel_exec {
   pid=$!
   #echo "PID: $pid running command \"$_command\""
   eval "$_pids+=($pid)"
-  eval "$_tmpFiles[pid]=$tmpFile"
+  eval "$_tmpFiles[$pid]=$tmpFile"
 }
 
 get_caid_list () {
