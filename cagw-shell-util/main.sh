@@ -114,11 +114,11 @@ regen_dateBased_filenames() {
   DATE=$(date +%s); export DATE
   export STDOUT="${TMP_WORKING_DIR}/stdout_${DATE}"
   export STDERR="${TMP_WORKING_DIR}/stderr_${DATE}"
-  export P12_CERT="${TMP_WORKING_DIR}/p12cert_${DATE}"
-  export P12_KEY="${TMP_WORKING_DIR}/p12key_${DATE}"
-  export P12_CA="${TMP_WORKING_DIR}/p12ca_${DATE}"
 }
 regen_dateBased_filenames
+export P12_CERT="${TMP_WORKING_DIR}/p12cert_${DATE}"
+export P12_KEY="${TMP_WORKING_DIR}/p12key_${DATE}"
+export P12_CA="${TMP_WORKING_DIR}/p12ca_${DATE}"
 
 # trap ctrl-c and call ctrl_c() to gracefully exit and cleanup.
 trap ctrl_c INT
