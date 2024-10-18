@@ -4,7 +4,9 @@
 
 [Prerequisites](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
 
-* [Acquiring credentials](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#acquiring-credentials)
+* [Acquiring credentials for PKIaaS CA Gateway](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#acquiring-credentials-for-pkiaas-ca-gateway)
+* [Acquiring credentials for On-Premise CA Gateway](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#acquiring-credentials-for-on-premise-ca-gateway)
+
 
 [Operations supported by the utility](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#operations-supported-by-the-utility)
 
@@ -19,9 +21,10 @@
 * [Bulk certificate issuance](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#bulk-certificate-issuance)
 * [Bulk certificate revocation](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#bulk-certificate-revocation)
 * [Generate Report of Active Certificates](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#generate-report-of-active-certificates)
+* [Revoke Certificates by Subject DN](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#revoke-certificates-by-subject-dn)
 
 ### Prerequisites
-#### Acquiring credentials
+#### Acquiring credentials for PKIaaS CA Gateway
 1. PKIaaS Root CA and Issuing CA is set up and active.
    - Copy and store the CA identifier(CAID):
 ![image](https://user-images.githubusercontent.com/98990887/171658845-a006a93b-bda6-4cf5-9026-b7fa3f734b32.png)
@@ -43,6 +46,11 @@
 
 [return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
 
+#### Acquiring credentials for On-Premise CA Gateway
+1. After CA Gateway is deployed and configured, copy the client certificate to the host running this utility.
+2. Import the CA certificate (issuer of CA Gateway server and client certificates) into the trust store of the host running this utility.
+
+
 ### Operations supported by the utility
 
 - Generate CSR with subject (using OpenSSL)
@@ -52,25 +60,36 @@
 - Enroll new certificate with P12
 - Certificate revocation by serial
 - Bulk certificate issuance
+- Bulk certificate revocation
 - Generate report of active certificates (CSV)
+- Revoke Certificates by Subject DN (On-Premises CAGW Only)
 
 [return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
 
 ### Running the script
 Execute the script in a terminal which has access to the CAGW Client Credential P12.
+From the terminal, go to `pki-utilities/cagw-shell-util` directory and run the `main.sh` file. 
 The script will prompt for the following information:
 
 - Path to CAGW Client Credential P12
 - Password for the CAGW Client Credential P12
 - The URL for CAGW (such as https://cagw.pkiaas.entrust.com/cagw)
 
-Sample output:
+Sample output for PKIaaS CA Gateway:
 
 ```
+$ ./main.sh
+--------------------------
+Depedencies
+--------------------------
+OpenSSL: 3.0.21
+cURL: 7.81.0
+JQ: jq-1.6
+Bash: GNU bash, version 5.1.16(1)-release (x86_64-pc-linux-gnu)
 --------------------------
 Entrust CA Gateway Utility
 --------------------------
-Path to client credentials file (PKCS#12): ./entrust-cagw-rqblr8xekifien.p12
+Path to client credentials file (PKCS#12): pkiaas-cagw-client.p12
 Enter PKCS#12 file password: Please select the CAGW type:
   1. PKIaaS
   2. On-Premises
@@ -81,20 +100,55 @@ Please select the PKIaaS Region:
   3. PQ: https://cagw.pqlab.pkiaas.entrust.com/cagw
 CAGW REGION: 1
 --------------------------
-CAGW P12: ./entrust-cagw-rqblr8xekifien.p12
+CAGW P12: pkiaas-cagw-client.p12
 CAGW URL: https://cagw.pkiaas.entrust.com/cagw
-
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
+```
+
+Sample output for On-Premise CAGW
+```
+$ ./main.sh
+--------------------------
+Depedencies
+--------------------------
+OpenSSL: 3.0.21
+cURL: 7.81.0
+JQ: jq-1.6
+Bash: GNU bash, version 5.1.16(1)-release (x86_64-pc-linux-gnu)
+--------------------------
+Entrust CA Gateway Utility
+--------------------------
+Path to client credentials file (PKCS#12): cagw-client-1.p12
+Enter PKCS#12 file password: Please select the CAGW type:
+  1. PKIaaS
+  2. On-Premises
+CAGW Type: 2
+Enter CA Gateway URL (e.g. https://cagw-server.com/cagw): https://test.cagw.com:8080/cagw
+--------------------------
+CAGW P12: cagw-client-1.p12
+CAGW URL: https://test.cagw.com:8080/cagw
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate (CSR / P12)
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Generate Report of all active certificates (CSV)
+  9. Revoke Certificates by Subject DN (On-Premises CAGW Only)
+  10. Exit
 ```
 
 [return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
@@ -114,11 +168,11 @@ Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
 Selection: 1
 --------------------------
@@ -147,11 +201,11 @@ Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
 Selection: 2
 --------------------------
@@ -191,11 +245,11 @@ Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
 Selection: 3
 --------------------------
@@ -245,11 +299,11 @@ Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
 Selection: 4
 --------------------------
@@ -303,11 +357,11 @@ Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
 Selection: 4
 --------------------------
@@ -357,11 +411,11 @@ Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
 Selection: 5
 --------------------------
@@ -429,11 +483,11 @@ Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
 Selection: 6
 --------------------------
@@ -495,11 +549,11 @@ Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
 Selection: 7
 --------------------------
@@ -562,11 +616,11 @@ Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
   2. List all Certificate Authorities
   3. List all profiles for a Certificate Authority
-  4. Enroll new certificate
+  4. Enroll new certificate (CSR / P12)
   5. Certificate revocation by serial
   6. Bulk certificate issuance
   7. Bulk certificate revocation
-  8. Fetch all active certificates
+  8. Generate Report of all active certificates (CSV)
   9. Exit
 Selection: 8
 --------------------------
@@ -612,3 +666,49 @@ CSV File: ./certificates_report_ecsmcn158emsuw~1sw46hf1g0wrdc_1709679837.csv
 ```
 
 [return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+
+#### Revoke Certificates by Subject DN
+Revoke the certificates by Subject DN. This option is available only for on-premise CA Gateway.
+
+Sample output:
+```
+--------------------------
+Select the CA Gateway operation:
+  1. Generate CSR with subject (using OpenSSL)
+  2. List all Certificate Authorities
+  3. List all profiles for a Certificate Authority
+  4. Enroll new certificate (CSR / P12)
+  5. Certificate revocation by serial
+  6. Bulk certificate issuance
+  7. Bulk certificate revocation
+  8. Generate Report of all active certificates (CSV)
+  9. Revoke Certificates by Subject DN (On-Premises CAGW Only)
+  10. Exit
+Selection: 9
+--------------------------
+Select a CA ID:
+1. Root-CA: eca102 (CN=root,O=entrust,C=CA)
+2. Root-CA: eca10 (CN=root,O=entrust,C=CA)
+Enter CA ID [eca102]: 1
+Subject DN: cn=test1.cagw,cn=root,o=entrust,c=CA
+Select action type from below:
+  1. Revoke
+  2. Renew
+  3. Reissue
+Action Type: 1
+Enter a comment about the action (optional): Test Revoke
+Select action reason from below
+  1. unspecified
+  2. keyCompromise
+  3. caCompromise
+  4. affiliationChanged
+  5. superseded
+  6. cessationOfOperation
+  7. certificateHold
+  8. privilegeWithdrawn
+Action Reason: 1
+```
+
+[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+
+
