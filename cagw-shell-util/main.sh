@@ -210,15 +210,13 @@ init() {
       printf '%s\n' "  1. US: https://cagw.pkiaas.entrust.com/cagw"
       printf '%s\n' "  2. EU: https://cagw.eu.pkiaas.entrust.com/cagw"
       printf '%s\n' "  3. PQ: https://cagw.pqlab.pkiaas.entrust.com/cagw"
-      printf '%s\n' "  4. MASTER: https://cagw.dev.pkihub.com/cagw"
-      while [[ ${CAGW_REGION} -lt 1 || ${CAGW_REGION} -gt 4 ]]; do
+      while [[ ${CAGW_REGION} -lt 1 || ${CAGW_REGION} -gt 3 ]]; do
         read -rp "CAGW REGION: " CAGW_REGION
-        [[ ${CAGW_REGION} -lt 1 || ${CAGW_REGION} -gt 4 ]] && echo "bad selection ${CAGW_REGION}"
+        [[ ${CAGW_REGION} -lt 1 || ${CAGW_REGION} -gt 3 ]] && echo "bad selection ${CAGW_REGION}"
       done
       [[ ${CAGW_REGION} -eq 1 ]] && export CAGW_URL="https://cagw.pkiaas.entrust.com/cagw"
       [[ ${CAGW_REGION} -eq 2 ]] && export CAGW_URL="https://cagw.eu.pkiaas.entrust.com/cagw"
       [[ ${CAGW_REGION} -eq 3 ]] && export CAGW_URL="https://cagw.pqlab.pkiaas.entrust.com/cagw"
-      [[ ${CAGW_REGION} -eq 4 ]] && export CAGW_URL="https://cagw.dev.pkihub.com/cagw"
       ;;
     "${ONPREM}")
       read -rp "Enter CA Gateway URL (e.g. https://cagw-server.com/cagw): " CAGW_URL
@@ -1167,7 +1165,6 @@ bulk_revoke() {
   OLDIFS=$IFS
   IFS=','
   snToRevoke=0
-  set -x
   while read dummy1 sn dummy2; do
     if test "$headers" == "0"; then
       headers=1
@@ -1178,7 +1175,6 @@ bulk_revoke() {
       ${CURL_COMMAND} --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
       if [[ "${RESULT}" -ne 0 ]]; then
         printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
-        set +x
         exit_and_cleanup "${RESULT}"
       fi
     fi
@@ -1190,11 +1186,9 @@ bulk_revoke() {
   ${CURL_COMMAND} --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"action\":{\"type\":\"RevokeAction\",\"reason\":\"$ACTION_REASON\",\"issueCrl\":\"true\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/certificates/$snToRevoke/actions" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
   if [[ "${RESULT}" -ne 0 ]]; then
     printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
-    set +x
     exit_and_cleanup "${RESULT}"
   fi
   IFS=$OLDIFS
-  set +x
 }
 
 generate_report() {
