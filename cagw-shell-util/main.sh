@@ -1122,6 +1122,10 @@ bulk_issue() {
     read -r
     while IFS=, read -r commonName keyLen keyAlgo
     do 
+      # Strip surrounding double quotes and carriage returns from CSV fields
+      commonName=$(printf '%s' "$commonName" | tr -d '\r"')
+      keyLen=$(printf '%s' "$keyLen" | tr -d '\r"')
+      keyAlgo=$(printf '%s' "$keyAlgo" | tr -d '\r"')
       openssl req -nodes -newkey "${keyAlgo}":"${keyLen}" -keyout "$TARGET_FOLDER/${commonName}.key" -out "$TARGET_FOLDER/${commonName}.csr" -subj "/CN=$commonName" &> /dev/null
       sed -i 1d "${TARGET_FOLDER}/${commonName}.csr" &> /dev/null
       sed -i '' -e '$ d' "${TARGET_FOLDER}/${commonName}.csr" &> /dev/null
@@ -1174,7 +1178,7 @@ bulk_revoke() {
         exit_and_cleanup "${RESULT}"
       fi
     fi
-    snToRevoke=$(printf '%s' "$sn" | tr -d '\r')
+    snToRevoke=$(printf '%s' "$sn" | tr -d '\r"')
 
   done <"$REVOKE_CSV"
 
