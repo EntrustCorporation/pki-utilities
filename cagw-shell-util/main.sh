@@ -1099,48 +1099,212 @@ revoke_sn() {
   printf '%s\n%s\n' "RESULT:" "$(cat "${STDOUT}")"
 }
 
+# trim_field(): Helper function to normalize the CSV data by stripping carriage return characters and all surrounding whitespace.
+# Note: This logic does not work as intended whenever the goal is to issue certificates where the common name (CN)
+#       has intentional leading or trailing whitespace.
+trim_field() {
+  local v="${1//$'\r'/}"
+  v="${v#"${v%%[![:space:]]*}"}"
+  printf '%s' "${v%"${v##*[![:space:]]}"}"
+}
+
+# generate_cert_base_filename(): Build a filesystem-safe basename (no extension, no folder) for the artifacts associated with
+# a (common_name, key_algorithm, key_size).
+# Unsafe characters are replaced by underscores.
+# A short hash gets appended to the end of the common name to distinguish between different
+# common names that would otherwise sanitize to the same filename.
+# The max base filename length that this will generate is 196 characters to allow room for a 4-character extension (e.g. .pem).
+generate_cert_base_filename() {
+  local cn="$1" algo="$2" len="$3"
+  local sanitized="${cn//[^A-Za-z0-9._-]/_}"
+  local hash8 suffix max_cn_len
+  if [[ "${sanitized}" != "${cn}" ]]; then
+    hash8=$(printf '%s' "${cn}" | openssl dgst -md5 -hex | awk '{print $NF}' | cut -c1-8)
+    suffix="-${hash8}_${algo}${len}"
+  else
+    suffix="_${algo}${len}"
+  fi
+  max_cn_len=$((200 - 4 - ${#suffix}))
+  [[ "${#sanitized}" -gt "${max_cn_len}" ]] && sanitized="${sanitized:0:max_cn_len}"
+  printf '%s' "${sanitized}${suffix}"
+}
+
 bulk_issue() {
   printf '%s\n' "${DIVIDER}"
+
+  # Declare local variables
+  local issue_csv target_folder
+  local bulk_count has_header processed_count empty_row_count
+  local _hdr_cn _hdr_algo _hdr_len _hdr_extra _csv_header
+  local line_num base_filename
+  local common_name key_algo key_len _extra
+  local openssl_output openssl_result
+  local csr_file
+  local csr_body payload jq_result
+  local curl_result response response_type
+  local failed_runtime=() failed_malformed=() failed_duplicate=()
+  local total_failed
+
+  # Get CAID and Profile ID for certificate issuance
   prompt_for_caid
   prompt_for_profileID
-  echo "Note, this operation requires a CSV-formatted file in the following format:"
-  echo "Common Name, Key Algorithm, Key Size"
-  echo "For example:"
-  echo "example common name, rsa, 4096"
-  ISSUE_CSV=""
-  while [[ ! -f "${ISSUE_CSV}" ]]; do
-    read  -e -rp "Enter the path to the CSV file: " ISSUE_CSV
+
+  # Get the path to the CSV file and the target folder for keys and certs.
+  printf '%s\n' "Note, this operation requires a CSV-formatted file in the following format:"
+  printf '%s\n' "Common Name, Key Algorithm, Key Size"
+  printf '%s\n' "For example:"
+  printf '%s\n' "example common name, rsa, 4096"
+  issue_csv=""
+  while [[ ! -f "${issue_csv}" ]]; do
+    read -e -rp "Enter the path to the CSV file: " issue_csv
   done
-  TARGET_FOLDER=""
-  while [[ ! -d "${TARGET_FOLDER}" ]]; do
-    read -e -rp "Enter the path for saving keys and certs: " TARGET_FOLDER
+  target_folder=""
+  while [[ ! -d "${target_folder}" ]]; do
+    read -e -rp "Enter the path for saving keys and certs: " target_folder
   done
-  BULK_COUNT=$(wc -l < "${ISSUE_CSV}" | tr -d ' ')
-  PROCESSED_COUNT=0
-  printf '%s\n' "Processing list of ${BULK_COUNT} bulk certificate enrollments..."
-  {
-    read -r
-    while IFS=, read -r commonName keyLen keyAlgo
-    do 
-      openssl req -nodes -newkey "${keyAlgo}":"${keyLen}" -keyout "$TARGET_FOLDER/${commonName}.key" -out "$TARGET_FOLDER/${commonName}.csr" -subj "/CN=$commonName" &> /dev/null
-      sed -i 1d "${TARGET_FOLDER}/${commonName}.csr" &> /dev/null
-      sed -i '' -e '$ d' "${TARGET_FOLDER}/${commonName}.csr" &> /dev/null
-      ${CURL_COMMAND} -s --header "Accept: application/json" -H "Content-Type: application/json" --data "{\"profileId\":\"$PROFILE_ID\",\"requiredFormat\":{\"format\":\"PEM\"},\"csr\":\"$(tr -d "\n\r" < "${TARGET_FOLDER}/${commonName}.csr")\",\"optionalCertificateRequestDetails\":{\"subjectDn\":\"CN=$commonName\"}}" --cert-type P12 --cert "$P12":"$P12_PWD" "$CAGW_URL/v1/certificate-authorities/$CAID/enrollments" 2>"${STDERR}" 1>"${STDOUT}"; RESULT=$?
-      if [[ "${RESULT}" -ne 0 ]]; then 
-        printf '%s\n' "ERROR ${RESULT}: $(cat "${STDOUT}") $(cat "${STDERR}")"
-        exit_and_cleanup "${RESULT}"
-      fi
-      RESPONSE=$(cat "${STDOUT}")
-      CERT_PATH=""
-      while [[ "${CERT_PATH}" == "" ]]; do
-        read -e -rp "Where would you like to store the certificate (e.g. ./certificate.pem): " CERT_PATH
-      done
-      echo "${RESPONSE}" | jq -r '.enrollment.body' >  "${TARGET_FOLDER}/${commonName}.pem"
-      PROCESSED_COUNT=$(( PROCESSED_COUNT + 1 ))
-      [[ $(( (PROCESSED_COUNT) % PAGE_SIZE )) -eq 0 ]] && printf '%s\n' "Processed ${PROCESSED_COUNT} certificate requests of ${BULK_COUNT}."
-    done
-  } < "${ISSUE_CSV}"
-  printf '%s\n' "Certificates and Keys written to the folder $(readlink -f "${TARGET_FOLDER}")"
+
+  bulk_count=$(awk 'NF{n++} END{print n+0}' "${issue_csv}")
+  processed_count=0
+  empty_row_count=0
+  # Ignore any extra columns beyond the first three.
+  IFS=, read -r _hdr_cn _hdr_algo _hdr_len _hdr_extra <"${issue_csv}" || true
+  has_header=0
+  [[ "$(trim_field "${_hdr_cn}")" == "Common Name" &&
+  "$(trim_field "${_hdr_algo}")" == "Key Algorithm" &&
+  "$(trim_field "${_hdr_len}")" == "Key Size" ]] && has_header=1
+  [[ "${has_header}" -eq 1 ]] && bulk_count=$((bulk_count > 0 ? bulk_count - 1 : 0))
+  if [[ "${bulk_count}" -eq 0 ]]; then
+    printf '%s\n' "No data rows found in '${issue_csv}'. Nothing to do."
+    return 0
+  fi
+
+  printf '%s\n' "Processing list of ${bulk_count} bulk certificate enrollments..."
+  # Reading the CSV on a dedicated file descriptor (FD 3) to avoid conflicts with other reads.
+  exec 3<"${issue_csv}"
+  if [[ "${has_header}" -eq 1 ]]; then
+    read -r -u 3 _csv_header
+    line_num=1
+  else
+    line_num=0
+  fi
+
+  # The main logic/loop. Iterate through each line of the CSV and process the data from the first three columns.
+  while IFS=, read -r -u 3 common_name key_algo key_len _extra; do
+    line_num=$((line_num + 1))
+
+    # Normalize each field (strip CR + trim surrounding whitespace).
+    common_name="$(trim_field "${common_name}")"
+    key_algo="$(trim_field "${key_algo}")"
+    key_len="$(trim_field "${key_len}")"
+
+    if [[ -z "${common_name}" && -z "${key_algo}" && -z "${key_len}" ]]; then
+      empty_row_count=$((empty_row_count + 1))
+      continue
+    fi
+
+    if [[ -z "${common_name}" || -z "${key_algo}" || -z "${key_len}" ]]; then
+      printf '%s\n' "Skipping malformed CSV row (line ${line_num}, missing fields): '${common_name},${key_algo},${key_len}'"
+      failed_malformed+=("${line_num}")
+      continue
+    fi
+
+    # Duplicate detection: an existing .pem means this exact (CN, algo, size) was already successfully enrolled previously.
+    base_filename=$(generate_cert_base_filename "${common_name}" "${key_algo}" "${key_len}")
+    if [[ -e "${target_folder}/${base_filename}.pem" ]]; then
+      printf '%s %s %s %s\n' \
+        "ERROR row line ${line_num}" \
+        "(CN '${common_name}', ${key_algo} ${key_len}):" \
+        "certificate already issued --" \
+        "'${target_folder}/${base_filename}.pem' exists."
+      failed_duplicate+=("${line_num}")
+      continue
+    fi
+
+    openssl_output=$(openssl req -nodes \
+      -newkey "${key_algo}":"${key_len}" \
+      -keyout "${target_folder}/${base_filename}.key" \
+      -out "${target_folder}/${base_filename}.csr" \
+      -subj "/CN=${common_name}" 2>&1)
+    openssl_result=$?
+    if [[ "${openssl_result}" -ne 0 ]]; then
+      printf '%s\n' "ERROR row line ${line_num} (CN '${common_name}'): openssl req failed (exit ${openssl_result}): ${openssl_output}"
+      failed_runtime+=("${line_num}")
+      continue
+    fi
+
+    # Obtain the CSR as a "single-line PEM" string, and build the JSON payload for the CAGW API.
+    csr_file="${target_folder}/${base_filename}.csr"
+    csr_body=$(sed '1d;$d' "${csr_file}" | tr -d "\n\r")
+    payload=$(jq -nc \
+      --arg pid "${PROFILE_ID}" \
+      --arg cn "${common_name}" \
+      --arg csr "${csr_body}" \
+      '{profileId: $pid,
+        requiredFormat: {format: "PEM"},
+        csr: $csr,
+        optionalCertificateRequestDetails: {subjectDn: ("CN=" + $cn)}}')
+    jq_result=$?
+    if [[ "${jq_result}" -ne 0 ]]; then
+      printf '%s\n' "ERROR row line ${line_num} (CN '${common_name}'): jq payload construction failed (exit ${jq_result})"
+      failed_runtime+=("${line_num}")
+      continue
+    fi
+
+    # Submit the CSR to the CAGW API for enrollment.
+    ${CURL_COMMAND} -s \
+      --header "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      --data "${payload}" \
+      --cert-type P12 \
+      --cert "${P12}":"${P12_PWD}" \
+      "${CAGW_URL}/v1/certificate-authorities/${CAID}/enrollments" \
+      2>"${STDERR}" 1>"${STDOUT}"
+    curl_result=$?
+    if [[ "${curl_result}" -ne 0 ]]; then
+      printf '%s\n' "ERROR row line ${line_num} (CN '${common_name}'): curl exit ${curl_result}: $(cat "${STDOUT}" "${STDERR}")"
+      failed_runtime+=("${line_num}")
+      continue
+    fi
+    response=$(cat "${STDOUT}")
+    response_type=$(printf '%s' "${response}" | jq -r '.type' 2>/dev/null)
+    if [[ "${response_type}" == "ErrorResponse" ]]; then
+      printf '%s\n' "ERROR row line ${line_num} (CN '${common_name}'): ErrorResponse: ${response}"
+      failed_runtime+=("${line_num}")
+      continue
+    fi
+    printf '%s\n' "${response}" | jq -r '.enrollment.body' >"${target_folder}/${base_filename}.pem"
+
+    # Update progress and failure counts before moving on to next row of data.
+    processed_count=$((processed_count + 1))
+    total_failed=$((${#failed_runtime[@]} + ${#failed_malformed[@]} + ${#failed_duplicate[@]}))
+    # Print progress every 10 rows and on the final row.
+    [[ $((processed_count % 10)) -eq 0 || $((processed_count + total_failed)) -eq "${bulk_count}" ]] &&
+      printf '%s\n' "Processed ${processed_count} of ${bulk_count} (failures: ${total_failed})."
+  done
+  exec 3<&-
+
+  # Print out final summary of results with details on any failures.
+  total_failed=$((${#failed_runtime[@]} + ${#failed_malformed[@]} + ${#failed_duplicate[@]}))
+  printf '%s\n' "Certificates and Keys written to the folder $(readlink -f "${target_folder}")"
+  printf '%s\n' "Summary:"
+  printf '  %s\n' "Total data rows:        ${bulk_count}"
+  printf '  %s\n' "Succeeded:              ${processed_count}"
+  if [[ "${#failed_runtime[@]}" -gt 0 ]]; then
+    printf '  %s\n' "Failed (runtime):       ${#failed_runtime[@]}    [lines: ${failed_runtime[*]}]"
+  else
+    printf '  %s\n' "Failed (runtime):       0"
+  fi
+  if [[ "${#failed_malformed[@]}" -gt 0 ]]; then
+    printf '  %s\n' "Failed (malformed):     ${#failed_malformed[@]}    [lines: ${failed_malformed[*]}]"
+  else
+    printf '  %s\n' "Failed (malformed):     0"
+  fi
+  if [[ "${#failed_duplicate[@]}" -gt 0 ]]; then
+    printf '  %s\n' "Failed (duplicate):     ${#failed_duplicate[@]}    [lines: ${failed_duplicate[*]}]"
+  else
+    printf '  %s\n' "Failed (duplicate):     0"
+  fi
+  printf '  %s\n' "Skipped (blank rows):   ${empty_row_count}"
 }
 
 bulk_revoke() {
