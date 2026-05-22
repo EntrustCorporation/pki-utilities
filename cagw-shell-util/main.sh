@@ -1134,6 +1134,7 @@ bulk_issue() {
 
   # Declare local variables
   local issue_csv target_folder
+  local output_format want_pem want_der output_label validity_period
   local bulk_count has_header processed_count empty_row_count
   local _hdr_cn _hdr_algo _hdr_len _hdr_extra _csv_header
   local line_num base_filename
@@ -1150,10 +1151,18 @@ bulk_issue() {
   prompt_for_profileID
 
   # Get the path to the CSV file and the target folder for keys and certs.
-  printf '%s\n' "Note, this operation requires a CSV-formatted file in the following format:"
-  printf '%s\n' "Common Name, Key Algorithm, Key Size"
-  printf '%s\n' "For example:"
-  printf '%s\n' "example common name, rsa, 4096"
+  printf '%s\n' "This operation requires a CSV file whose first three columns are:"
+  printf '%s\n' "  Common Name, Key Algorithm, Key Size/Curve"
+  printf '%s\n' "A header row is optional. If present, the first three column headers must be exactly:"
+  printf '%s\n' "  Common Name, Key Algorithm, Key Size/Curve"
+  printf '%s\n' "Additional columns beyond the first three are permitted and will be ignored."
+  printf '%s\n' ""
+  printf '%s\n' "Example CSV contents:"
+  printf '%s\n' "  Common Name, Key Algorithm, Key Size/Curve, Comment"
+  printf '%s\n' "  web-server.example.com, RSA, 4096, Production web server"
+  printf '%s\n' "  api-gateway.example.com, EC, prime256v1, API endpoint"
+  printf '%s\n' "  mail-server.example.com, RSA, 2048, Internal mail"
+  printf '%s\n' ""
   issue_csv=""
   while [[ ! -f "${issue_csv}" ]]; do
     read -e -rp "Enter the path to the CSV file: " issue_csv
@@ -1163,15 +1172,53 @@ bulk_issue() {
     read -e -rp "Enter the path for saving keys and certs: " target_folder
   done
 
+  # Prompt for certificate output format.
+  printf '%s\n' "Select the certificate output format:"
+  printf '%s\n' "  1. PEM only (.pem)"
+  printf '%s\n' "  2. DER only (.crt)"
+  printf '%s\n' "  3. Both PEM and DER (.pem + .crt)"
+  output_format=""
+  while [[ ! "${output_format}" =~ ^[1-3]$ ]]; do
+    read -rp "Output format: " output_format
+  done
+  case "${output_format}" in
+    1) want_pem=1; want_der=0; output_label="PEM (.pem)" ;;
+    2) want_pem=0; want_der=1; output_label="DER (.crt)" ;;
+    3) want_pem=1; want_der=1; output_label="PEM (.pem) + DER (.crt)" ;;
+  esac
+
+  # Prompt for certificate validity period (optional).
+  printf '%s\n' "Specify a custom certificate validity period, or press Enter to use the certificate profile's default value."
+  printf '%s\n' "  1. Days" "  2. Months" "  3. Years"
+  local validity_unit
+  validity_period=""
+  read -rp "Validity unit (or Enter to skip): " validity_unit
+  if [[ -n "${validity_unit}" ]]; then
+    while [[ ! "${validity_unit}" =~ ^[1-3]$ ]]; do
+      read -rp "Validity unit (1=Days, 2=Months, 3=Years): " validity_unit
+    done
+    local validity_value=""
+    while [[ ! "${validity_value}" =~ ^[1-9][0-9]*$ ]]; do
+      read -rp "Validity value (whole number): " validity_value
+    done
+    local -a _duration_suffix=('' D M Y)
+    validity_period="P${validity_value}${_duration_suffix[validity_unit]}"
+    printf '%s\n' "Validity period: ${validity_period}"
+  else
+    printf '%s\n' "Using profile default validity period."
+  fi
+
   bulk_count=$(awk 'NF{n++} END{print n+0}' "${issue_csv}")
   processed_count=0
   empty_row_count=0
   # Ignore any extra columns beyond the first three.
   IFS=, read -r _hdr_cn _hdr_algo _hdr_len _hdr_extra <"${issue_csv}" || true
   has_header=0
+  local _trimmed_len
+  _trimmed_len=$(trim_field "${_hdr_len}")
   [[ "$(trim_field "${_hdr_cn}")" == "Common Name" &&
   "$(trim_field "${_hdr_algo}")" == "Key Algorithm" &&
-  "$(trim_field "${_hdr_len}")" == "Key Size" ]] && has_header=1
+  ("${_trimmed_len}" == "Key Size" || "${_trimmed_len}" == "Key Size/Curve") ]] && has_header=1
   [[ "${has_header}" -eq 1 ]] && bulk_count=$((bulk_count > 0 ? bulk_count - 1 : 0))
   if [[ "${bulk_count}" -eq 0 ]]; then
     printf '%s\n' "No data rows found in '${issue_csv}'. Nothing to do."
@@ -1208,20 +1255,27 @@ bulk_issue() {
       continue
     fi
 
-    # Duplicate detection: an existing .pem means this exact (CN, algo, size) was already successfully enrolled previously.
+    # Duplicate detection: an existing cert file means this exact (CN, algo, size) was already successfully enrolled previously.
     base_filename=$(generate_cert_base_filename "${common_name}" "${key_algo}" "${key_len}")
-    if [[ -e "${target_folder}/${base_filename}.pem" ]]; then
+    if [[ "${want_pem}" -eq 1 && -e "${target_folder}/${base_filename}.pem" ]] ||
+       [[ "${want_der}" -eq 1 && -e "${target_folder}/${base_filename}.crt" ]]; then
       printf '%s %s %s %s\n' \
         "ERROR row line ${line_num}" \
         "(CN '${common_name}', ${key_algo} ${key_len}):" \
         "certificate already issued --" \
-        "'${target_folder}/${base_filename}.pem' exists."
+        "output file already exists in '${target_folder}/'."
       failed_duplicate+=("${line_num}")
       continue
     fi
 
+    local -a newkey_args
+    if [[ "${key_algo,,}" == "ec" ]]; then
+      newkey_args=(-newkey ec -pkeyopt "ec_paramgen_curve:${key_len}")
+    else
+      newkey_args=(-newkey "${key_algo}:${key_len}")
+    fi
     openssl_output=$(openssl req -nodes \
-      -newkey "${key_algo}":"${key_len}" \
+      "${newkey_args[@]}" \
       -keyout "${target_folder}/${base_filename}.key" \
       -out "${target_folder}/${base_filename}.csr" \
       -subj "/CN=${common_name}" 2>&1)
@@ -1239,10 +1293,13 @@ bulk_issue() {
       --arg pid "${PROFILE_ID}" \
       --arg cn "${common_name}" \
       --arg csr "${csr_body}" \
+      --arg vp "${validity_period}" \
       '{profileId: $pid,
         requiredFormat: {format: "PEM"},
         csr: $csr,
-        optionalCertificateRequestDetails: {subjectDn: ("CN=" + $cn)}}')
+        optionalCertificateRequestDetails: (
+          {subjectDn: ("CN=" + $cn)}
+          + if $vp != "" then {validityPeriod: $vp} else {} end)}')
     jq_result=$?
     if [[ "${jq_result}" -ne 0 ]]; then
       printf '%s\n' "ERROR row line ${line_num} (CN '${common_name}'): jq payload construction failed (exit ${jq_result})"
@@ -1273,6 +1330,13 @@ bulk_issue() {
       continue
     fi
     printf '%s\n' "${response}" | jq -r '.enrollment.body' >"${target_folder}/${base_filename}.pem"
+    # Save certificate in the selected format(s).
+    if [[ "${want_der}" -eq 1 ]]; then
+      openssl x509 -in "${target_folder}/${base_filename}.pem" -outform DER \
+        -out "${target_folder}/${base_filename}.crt" 2>/dev/null ||
+        printf '%s\n' "WARNING row line ${line_num} (CN '${common_name}'): failed to convert certificate to DER format."
+    fi
+    [[ "${want_pem}" -eq 0 ]] && rm -f "${target_folder}/${base_filename}.pem"
 
     # Update progress and failure counts before moving on to next row of data.
     processed_count=$((processed_count + 1))
@@ -1287,6 +1351,8 @@ bulk_issue() {
   total_failed=$((${#failed_runtime[@]} + ${#failed_malformed[@]} + ${#failed_duplicate[@]}))
   printf '%s\n' "Certificates and Keys written to the folder $(readlink -f "${target_folder}")"
   printf '%s\n' "Summary:"
+  printf '  %s\n' "Output format:          ${output_label}"
+  printf '  %s\n' "Validity period:        ${validity_period:-Profile default}"
   printf '  %s\n' "Total data rows:        ${bulk_count}"
   printf '  %s\n' "Succeeded:              ${processed_count}"
   if [[ "${#failed_runtime[@]}" -gt 0 ]]; then

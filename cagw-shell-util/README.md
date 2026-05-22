@@ -1,36 +1,36 @@
-## Entrust Certificate Authority (CA) Gateway Shell utility
+# Entrust Certificate Authority (CA) Gateway Shell utility
 
-### Table of Contents
+## Table of Contents
 
-[Prerequisites](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[Prerequisites](#prerequisites)
 
-* [Acquiring credentials for PKIaaS CA Gateway](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#acquiring-credentials-for-pkiaas-ca-gateway)
-* [Acquiring credentials for On-Premise CA Gateway](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#acquiring-credentials-for-on-premise-ca-gateway)
+* [Acquiring credentials for PKIaaS CA Gateway](#acquiring-credentials-for-pkiaas-ca-gateway)
+* [Acquiring credentials for On-Premise CA Gateway](#acquiring-credentials-for-on-premise-ca-gateway)
 
+[Operations supported by the utility](#operations-supported-by-the-utility)
+[Running the script](#running-the-script)
 
-[Operations supported by the utility](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#operations-supported-by-the-utility)
-
-[Running the script](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#running-the-script)
-
-* [Generate CSR with subject](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#generate-csr-with-subject)
-* [List all Certificate Authorities](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#list-all-certificate-authorities)
-* [List all profiles for a Certificate Authority](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#list-all-profiles-for-a-certificate-authority)
-* [Enroll new certificate with CSR](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#enroll-new-certificate-with-csr)
-* [Enroll new certificate with PKCS #12](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#enroll-new-certificate-with-pkcs-12)
-* [Certificate revocation by serial](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#certificate-revocation-by-serial)
-* [Bulk certificate issuance](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#bulk-certificate-issuance)
-* [Bulk certificate revocation](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#bulk-certificate-revocation)
-* [Generate Report of Active Certificates](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#generate-report-of-active-certificates)
-* [Revoke Certificates by Subject DN](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#revoke-certificates-by-subject-dn)
+* [Generate CSR with subject](#generate-csr-with-subject)
+* [List all Certificate Authorities](#list-all-certificate-authorities)
+* [List all profiles for a Certificate Authority](#list-all-profiles-for-a-certificate-authority)
+* [Enroll new certificate with CSR](#enroll-new-certificate-with-csr)
+* [Enroll new certificate with PKCS #12](#enroll-new-certificate-with-pkcs-12)
+* [Certificate revocation by serial](#certificate-revocation-by-serial)
+* [Bulk certificate issuance](#bulk-certificate-issuance)
+* [Bulk certificate revocation](#bulk-certificate-revocation)
+* [Generate Report of Active Certificates](#generate-report-of-active-certificates)
+* [Revoke Certificates by Subject DN](#revoke-certificates-by-subject-dn)
 
 ### Prerequisites
+
 #### Acquiring credentials for PKIaaS CA Gateway
+
 1. PKIaaS Root CA and Issuing CA is set up and active.
-   - Copy and store the CA identifier(CAID):
+   * Copy and store the CA identifier(CAID):
 ![image](https://user-images.githubusercontent.com/98990887/171658845-a006a93b-bda6-4cf5-9026-b7fa3f734b32.png)
 
 2. CA Gateway Credential is downloaded along with the password.
-   - To generate and download the CA Gateway credentials
+   * To generate and download the CA Gateway credentials
 
 | Step | Description |
 | --- | --- |
@@ -44,40 +44,41 @@
 | 8. | Copy and store the PKCS12 password and the CA Gateway URL. |
 | 9. | Click **Download PKCS12.**<br />![image](https://user-images.githubusercontent.com/98990887/172181900-f3adc645-ca85-4483-b90b-3e0b482d754a.png) |
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### Acquiring credentials for On-Premise CA Gateway
+
 1. After CA Gateway is deployed and configured, copy the client certificate to the host running this utility.
 2. Import the CA certificate (issuer of CA Gateway server and client certificates) into the trust store of the host running this utility.
 
-
 ### Operations supported by the utility
 
-- Generate CSR with subject (using OpenSSL)
-- List all Certificate Authorities
-- List all profiles for a Certificate Authority
-- Enroll new certificate with CSR
-- Enroll new certificate with P12
-- Certificate revocation by serial
-- Bulk certificate issuance
-- Bulk certificate revocation
-- Generate report of active certificates (CSV)
-- Revoke Certificates by Subject DN (On-Premises CAGW Only)
+* Generate CSR with subject (using OpenSSL)
+* List all Certificate Authorities
+* List all profiles for a Certificate Authority
+* Enroll new certificate with CSR
+* Enroll new certificate with P12
+* Certificate revocation by serial
+* Bulk certificate issuance
+* Bulk certificate revocation
+* Generate report of active certificates (CSV)
+* Revoke Certificates by Subject DN (On-Premises CAGW Only)
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 ### Running the script
+
 Execute the script in a terminal which has access to the CAGW Client Credential P12.
-From the terminal, go to `pki-utilities/cagw-shell-util` directory and run the `main.sh` file. 
+From the terminal, go to `pki-utilities/cagw-shell-util` directory and run the `main.sh` file.
 The script will prompt for the following information:
 
-- Path to CAGW Client Credential P12
-- Password for the CAGW Client Credential P12
-- The URL for CAGW (such as https://cagw.pkiaas.entrust.com/cagw)
+* Path to CAGW Client Credential P12
+* Password for the CAGW Client Credential P12
+* The URL for CAGW (such as `https://cagw.pkiaas.entrust.com/cagw`)
 
 Sample output for PKIaaS CA Gateway:
 
-```
+```text
 $ ./main.sh
 --------------------------
 Depedencies
@@ -116,7 +117,8 @@ Select the CA Gateway operation:
 ```
 
 Sample output for On-Premise CAGW
-```
+
+```text
 $ ./main.sh
 --------------------------
 Depedencies
@@ -151,9 +153,10 @@ Select the CA Gateway operation:
   10. Exit
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### Generate CSR with subject
+
 Generate CSR with given subject.
 
 It also massages the CSR so that the request is acceptable by CA Gateway.
@@ -162,7 +165,7 @@ CA Gateway, currently requires header, footer, and nelines deleted.
 
 Sample output:
 
-```
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -185,9 +188,10 @@ Where would you like to store the key (e.g. /tmp/example.key): ./example.key
 Where would you like to store the CSR (e.g. /tmp/example.csr): ./example.csr
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### List all Certificate Authorities
+
 Fetches all the Certificate Authorities as configured on a given CA Gateway instance.
 
 Requires CA Gateway credentials for authenticating requests.
@@ -195,7 +199,7 @@ Prints out a list of Certificate Authorities.
 
 Sample output:
 
-```
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -231,15 +235,16 @@ Selection: 2
 }
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### List all profiles for a Certificate Authority
+
 Fetches all the Certificate Profiles configured for a give Certificate Authority.
 
 Requires CA Gateway credentials for authenticating requests.
 Prints a list of Certificate Profiles supported on the selected Certificate Authority.
 
-```
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -281,7 +286,7 @@ Enter CA ID [ecsmcn158emsuw~mrajwn1pklzxjb]: 2
 }
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### Enroll new certificate with CSR
 
@@ -293,7 +298,7 @@ You can optionally add multiple Subject Altnames to the request.
 
 Sample output:
 
-```
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -340,9 +345,10 @@ Do you want to add a Subject Alternate Name (Y/N): n
 Certificate is written successfully to the file ./example.crt.
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### Enroll new certificate with PKCS #12
+
 Submit an enrollment request without requiring a CSR. CAGW will generate a private key and a certificate in a password protected P12 file. The user will be prompted to select the desired Certificate Authority, Certificate Profile, and password to secure the P12 file.
 
 The resulting certificate will be saved to the user-defined path.
@@ -351,7 +357,7 @@ You can optionally add multiple Subject Altnames to the request.
 
 Sample output:
 
-```
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -398,14 +404,15 @@ Do you want to add a Subject Alternate Name (Y/N): n
 Certificate is written successfully to the file ./example.p12.
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### Certificate revocation by serial
+
 Revoke/renew/reissue certificate using the certificate's serial number.
 
 Sample output:
 
-```
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -456,28 +463,42 @@ Action Reason: 1
 }
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### Bulk certificate issuance
-Use a CSV file to generate keys and certs in bulk.
 
-Sample CSV file must have the data arranged in the following format **without headers**.
+Use a CSV file to generate keys and certificates in bulk.
 
-| commonName | keyLen | keyAlgo |
+The CSV file must have three columns in the following order:
+
+| Common Name | Key Algorithm | Key Size/Curve |
 | --- | --- | --- |
-| example.com | 2048 | rsa |
-| abc.corp | 2048 | rsa |
+| web-server.example.com | RSA | 4096 |
+| api-gateway.example.com | EC | prime256v1 |
+| mail-server.example.com | RSA | 2048 |
 
-See below for an excerpt of a valid CSV file:
+* A header row is optional. If present, the first three column headers must be exactly: `Common Name, Key Algorithm, Key Size/Curve` (or `Key Size` for backward compatibility).
+* For RSA keys, the third column is the key size in bits (e.g., `2048`, `4096`).
+* For EC keys, the third column is the OpenSSL curve name (e.g., `prime256v1`, `secp384r1`).
+* Additional columns beyond the first three are permitted and will be ignored.
 
+See below for an excerpt of a valid CSV file (with an optional header row and a comment column):
+
+```csv
+Common Name, Key Algorithm, Key Size/Curve, Comment
+web-server.example.com, RSA, 4096, Production web server
+api-gateway.example.com, EC, prime256v1, API endpoint
+mail-server.example.com, RSA, 2048, Internal mail
 ```
-example.com,2048,rsa
-abc.corp,2048,rsa
-```
+
+The script will also prompt for:
+
+* **Output format** — PEM only (.pem), DER only (.crt), or both.
+* **Validity period** — optional custom lifetime in days, months, or years. Press Enter to use the certificate profile's default.
 
 Sample output:
 
-```
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -502,37 +523,67 @@ Select a Profile ID:
 4. mdmws-key-encipherment
 5. mdmws-non-repudiation
 Enter Profile ID []: 3
-Note, this operation requires a CSV-formatted file in the following format:
-Common Name, Key Algorithm, Key Size
-For example:
-example common name, rsa, 4096
+This operation requires a CSV file whose first three columns are:
+  Common Name, Key Algorithm, Key Size/Curve
+A header row is optional. If present, the first three column headers must be exactly:
+  Common Name, Key Algorithm, Key Size/Curve
+Additional columns beyond the first three are permitted and will be ignored.
+
+Example CSV contents:
+  Common Name, Key Algorithm, Key Size/Curve, Comment
+  web-server.example.com, RSA, 4096, Production web server
+  api-gateway.example.com, EC, prime256v1, API endpoint
+  mail-server.example.com, RSA, 2048, Internal mail
+
 Enter the path to the CSV file: ./bulk.csv
 Enter the path for saving keys and certs: /tmp
-Processing list of 2 bulk certificate enrollments...
+Select the certificate output format:
+  1. PEM only (.pem)
+  2. DER only (.crt)
+  3. Both PEM and DER (.pem + .crt)
+Output format: 1
+Specify a custom certificate validity period, or press Enter to use the certificate profile's default value.
+  1. Days
+  2. Months
+  3. Years
+Validity unit (or Enter to skip):
+Using profile default validity period.
+Processing list of 3 bulk certificate enrollments...
+Processed 3 of 3 (failures: 0).
 Certificates and Keys written to the folder /tmp
+Summary:
+  Output format:          PEM (.pem)
+  Validity period:        Profile default
+  Total data rows:        3
+  Succeeded:              3
+  Failed (runtime):       0
+  Failed (malformed):     0
+  Failed (duplicate):     0
+  Skipped (blank rows):   0
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### Bulk certificate revocation
+
 Revoke a list of certificates using a CSV File.
 The contents of the CSV file must contain serial numbers in the 2nd column. For example, the following structure is valid
 
-| commonName | serialNumber
+| commonName | serialNumber |
 | --- | --- |
 | example.com | 00000000dc517fb9b9c3eb3b890ff2a34812e33c |
 | abc.corp | 0000000011ddbf8d7346f20834769f7a8ffc43ca |
 
 See below for an excerpt of a valid CSV file:
 
-```
+```text
 example.com,00000000dc517fb9b9c3eb3b890ff2a34812e33c
 abc.corp,0000000011ddbf8d7346f20834769f7a8ffc43ca
 ```
 
 For PKIaaS Certificate Authorities, the CSV file can be automatically generated using the ECS Portal. To generate the CSV file from ECS Portal:
 
-- To export certificates on **ECS Enterprise Portal**:
+* To export certificates on **ECS Enterprise Portal**:
 
     | Step | Description |
     | --- | --- |
@@ -543,7 +594,7 @@ For PKIaaS Certificate Authorities, the CSV file can be automatically generated 
 
 Sample output:
 
-```
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -603,14 +654,15 @@ REVOKE SN : 00000000dc517fb9b9c3eb3b890ff2a34812e33c
 }
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### Generate Report of Active Certificates
+
 Generate a CSV-formatted report of all active certificates from the selected Certificate Authority.
 
 Sample output:
 
-```
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -665,13 +717,15 @@ CSV Contains 548 active certificate
 CSV File: ./certificates_report_ecsmcn158emsuw~1sw46hf1g0wrdc_1709679837.csv
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
 
 #### Revoke Certificates by Subject DN
+
 Revoke the certificates by Subject DN. This option is available only for on-premise CA Gateway.
 
 Sample output:
-```
+
+```text
 --------------------------
 Select the CA Gateway operation:
   1. Generate CSR with subject (using OpenSSL)
@@ -709,6 +763,4 @@ Select action reason from below
 Action Reason: 1
 ```
 
-[return to top of page](https://github.com/EntrustCorporation/pki-utilities/tree/main/cagw-shell-util#entrust-certificate-authority-ca-gateway-shell-utility)
-
-
+[return to top of page](#entrust-certificate-authority-ca-gateway-shell-utility)
